@@ -37,3 +37,11 @@ lerna-debug.log*
 *.sln
 *.sw?
 Thumbs.db
+
+# Sensitive Documents, PRD & Backend GAS files
+Code.gs
+backend-gas/
+Dokumentasi_SI_ABSEN.md
+PRD_SI_ABSEN.md
+SI_ABSEN_OBSIDIAN_MASTER_CONTEXT.md
+docs/

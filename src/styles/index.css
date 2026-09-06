@@ -1,0 +1,191 @@
+:root {
+  --primary: #00838F;
+  --primary-light: #0097A7;
+  --primary-dark: #006064;
+  --primary-subtle: #E0F7FA;
+  --accent: #26A69A;
+  --accent-orange: #FF7043;
+  --success: #2E7D32;
+  --success-bg: #E8F5E9;
+  --warning: #F57F17;
+  --warning-bg: #FFFDE7;
+  --danger: #C62828;
+  --danger-bg: #FFEBEE;
+  --text-main: #1E293B;
+  --text-muted: #64748B;
+  --text-light: #94A3B8;
+  --bg-page: #F1F5F9;
+  --bg-card: #FFFFFF;
+  --border-color: #E2E8F0;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0, 131, 143, 0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 131, 143, 0.15), 0 8px 10px -6px rgba(0,0,0,0.05);
+  --shadow-float: 0 12px 30px rgba(0, 131, 143, 0.35);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-page);
+  color: var(--text-main);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Container responsive */
+.app-container {
+  max-width: 480px;
+  margin: 0 auto;
+  background-color: #FFFFFF;
+  min-height: 100vh;
+  position: relative;
+  box-shadow: 0 0 35px rgba(0,0,0,0.07);
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background-color: var(--bg-page);
+}
+
+/* Utility classes */
+.flex { display: flex; }
+.flex-col { display: flex; flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+
+.text-sm { font-size: 0.875rem; }
+.text-xs { font-size: 0.75rem; }
+.text-lg { font-size: 1.125rem; }
+.text-xl { font-size: 1.25rem; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* =========================================================
+   SMOOTH AUTH & PAGE TRANSITION ANIMATIONS
+   ========================================================= */
+
+@keyframes authFadeSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes authSlideLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(36px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes authSlideRight {
+  0% {
+    opacity: 0;
+    transform: translateX(-36px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes floatLogo {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 8px 20px rgba(0, 131, 143, 0.28);
+  }
+  50% {
+    box-shadow: 0 12px 28px rgba(0, 131, 143, 0.45);
+  }
+}
+
+.auth-card-animate {
+  animation: authFadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.auth-register-animate {
+  animation: authSlideLeft 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.auth-login-animate {
+  animation: authSlideRight 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.logo-float-animate {
+  animation: floatLogo 3.5s ease-in-out infinite;
+}
+
+.logo-glow-animate {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.smooth-fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

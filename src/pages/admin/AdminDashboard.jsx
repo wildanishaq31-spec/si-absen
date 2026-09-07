@@ -434,10 +434,10 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
               }}
-              title="Sinkronkan data pegawai & presensi dari Google Spreadsheet"
+              title="Sinkronkan data pegawai & presensi dari Cloud Database"
             >
               <RefreshCw size={15} className={isSyncingCloud ? 'animate-spin' : ''} />
-              <span>{isSyncingCloud ? 'Menyinkronkan...' : 'Sinkronkan Google Data'}</span>
+              <span>{isSyncingCloud ? 'Menyinkronkan...' : 'Sinkronkan Data Cloud'}</span>
             </button>
 
             {/* Quick Export Excel Shortcut */}
@@ -1676,18 +1676,18 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
               </div>
             </div>
 
-            {/* CARD 2: KONFIGURASI PENYIMPANAN DATABASE & FOTO (STORAGE GOOGLE VS STORAGE SERVER) */}
+            {/* CARD 2: KONFIGURASI CLOUD DATABASE (VERCEL POSTGRES) & PENYIMPANAN FOTO (GOOGLE DRIVE / RUSTFS) */}
             <div className="table-card" style={{ padding: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: storageProviderInput === 'GOOGLE' ? '#ECFDF5' : '#F3E8FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: storageProviderInput === 'GOOGLE' ? '#059669' : '#7C3AED', transition: 'all 0.3s ease' }}>
-                  {storageProviderInput === 'GOOGLE' ? <Cloud size={24} /> : <HardDrive size={24} />}
+                  {storageProviderInput === 'GOOGLE' ? <Database size={24} /> : <HardDrive size={24} />}
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: storageProviderInput === 'GOOGLE' ? '#059669' : '#7C3AED', margin: 0, transition: 'color 0.3s ease' }}>
-                    2. Konfigurasi Penyimpanan Database & Foto Bukti Presensi
+                    2. Konfigurasi Cloud Database & Penyimpanan Foto Bukti Presensi
                   </h3>
                   <p style={{ fontSize: '0.82rem', color: '#64748B', margin: 0 }}>
-                    Pilih metode penyimpanan data absensi dan foto bukti: <strong>Google Cloud (Spreadsheet & Drive)</strong> atau <strong>Dedicated Server (RustFS)</strong>.
+                    Penyimpanan data akun & riwayat presensi: <strong>Vercel Postgres (Neon)</strong> dan penyimpanan foto bukti: <strong>Google Drive / RustFS</strong>.
                   </p>
                 </div>
               </div>
@@ -1699,7 +1699,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                 gap: '14px',
                 marginBottom: '22px'
               }}>
-                {/* Opsi 1: Google Storage */}
+                {/* Opsi 1: Vercel Postgres & Google Drive */}
                 <div
                   onClick={() => {
                     setStorageProviderInput('GOOGLE');
@@ -1707,7 +1707,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                       ...settings,
                       storageProvider: 'GOOGLE'
                     });
-                    showSuccess('Mode penyimpanan aktif: Google Spreadsheet & Google Drive!');
+                    showSuccess('Mode penyimpanan aktif: Vercel Postgres (Neon) & Google Drive!');
                   }}
                   style={{
                     padding: '16px 18px',
@@ -1733,12 +1733,12 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                     justifyContent: 'center',
                     flexShrink: 0
                   }}>
-                    <Cloud size={24} />
+                    <Database size={24} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                       <span style={{ fontSize: '0.98rem', fontWeight: 800, color: storageProviderInput === 'GOOGLE' ? '#065F46' : '#1E293B' }}>
-                        🌐 Google Cloud Storage
+                        🌐 Vercel Postgres & Google Drive
                       </span>
                       {storageProviderInput === 'GOOGLE' && (
                         <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', backgroundColor: '#A7F3D0', color: '#065F46' }}>
@@ -1747,7 +1747,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                       )}
                     </div>
                     <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: storageProviderInput === 'GOOGLE' ? '#047857' : '#64748B', lineHeight: 1.35 }}>
-                      Data tersimpan di Google Spreadsheet & foto tersusun rapi per Tahun, Bulan, Tanggal di Google Drive.
+                      Database cloud permanen Neon Postgres untuk akun & presensi. Foto bukti presensi tersimpan di Google Drive.
                     </p>
                   </div>
                 </div>
@@ -1806,7 +1806,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                 </div>
               </div>
 
-              {/* PANEL 1: PENGATURAN GOOGLE CLOUD STORAGE */}
+              {/* PANEL 1: PENGATURAN VERCEL POSTGRES & GOOGLE DRIVE STORAGE */}
               {storageProviderInput === 'GOOGLE' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', background: '#F8FAFC', padding: '20px', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
                   
@@ -1815,39 +1815,40 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                     <CheckCircle2 size={20} color="#059669" />
                     <div>
                       <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#065F46' }}>
-                        Mode Aktif: Google Cloud Storage (Spreadsheet & Drive)
+                        Mode Aktif: Vercel Postgres (Neon) & Google Drive Storage
                       </div>
                       <div style={{ fontSize: '0.78rem', color: '#047857' }}>
-                        Seluruh akun pegawai, riwayat presensi masuk/pulang, dan rekap disinkronkan ke Spreadsheet. Foto bukti otomatis disimpan ke Google Drive.
+                        Seluruh akun pegawai, riwayat presensi masuk/pulang, shift, dan rekap disinkronkan langsung ke database cloud PostgreSQL. Foto bukti otomatis disimpan ke Google Drive.
                       </div>
                     </div>
                   </div>
 
                   {/* Form Inputs Grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-                    {/* Link Spreadsheet */}
-                    <div>
-                      <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <FileSpreadsheet size={16} color="#059669" />
-                        <span>Link Google Spreadsheet (Data Rekap & Akun)</span>
-                      </label>
-                      <input
-                        type="url"
-                        placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit"
-                        value={googleSpreadsheetUrlInput}
-                        onChange={(e) => setGoogleSpreadsheetUrlInput(e.target.value)}
-                        style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
-                      />
-                      <span style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '4px', display: 'block' }}>
-                        ID Spreadsheet: <code>{cloudApiService.extractSpreadsheetId(googleSpreadsheetUrlInput) || '(Tempel URL Spreadsheet di atas)'}</code>
-                      </span>
+                    {/* Status Database Postgres */}
+                    <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: '10px', border: '1.5px solid #CBD5E1', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                          <Database size={16} color="#059669" />
+                          <span>Database Cloud Utama: <strong>Vercel Postgres (Neon)</strong></span>
+                        </label>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748B', lineHeight: 1.4 }}>
+                          Tersambung langsung via serverless environment variable <code>POSTGRES_URL</code>. Tabel <code>users</code>, <code>attendance</code>, dan <code>settings</code> terkelola otomatis.
+                        </p>
+                      </div>
+                      <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', backgroundColor: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }}></span>
+                          Terkoneksi Otomatis
+                        </span>
+                      </div>
                     </div>
 
                     {/* Link Folder Google Drive */}
-                    <div>
+                    <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: '10px', border: '1.5px solid #CBD5E1' }}>
                       <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                         <Folder size={16} color="#0284C7" />
-                        <span>Link Folder Utama Google Drive (Penyimpanan Foto)</span>
+                        <span>Link Folder Utama Google Drive (Penyimpanan Foto Bukti)</span>
                       </label>
                       <input
                         type="url"
@@ -1867,10 +1868,10 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                     <Cloud size={24} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
                     <div>
                       <h4 style={{ margin: '0 0 4px', fontSize: '0.9rem', fontWeight: 800, color: '#065F46' }}>
-                        ✅ Backend Vercel Serverless Aktif (100% Bebas Apps Script)
+                        ✅ Backend Vercel Serverless & Postgres Aktif (Bebas Apps Script & Bebas Lemot)
                       </h4>
                       <p style={{ margin: 0, fontSize: '0.8rem', color: '#047857', lineHeight: 1.5 }}>
-                        Integrasi Google Cloud sekarang di-handle langsung secara otomatis oleh backend Vercel API (<code>/api/sync</code>). Anda tidak perlu lagi memasang atau mengedit <code>Code.gs</code> di Apps Script.
+                        Integrasi database cloud dikelola langsung oleh Vercel API (<code>/api/sync</code>) menggunakan driver Neon Serverless. Untuk mengunduh laporan multi-sheet kapan saja, gunakan tombol <strong>"Unduh Excel Rekap"</strong> di tab Riwayat Presensi.
                       </p>
                     </div>
                   </div>
@@ -1883,12 +1884,11 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                         const newSettings = {
                           ...settings,
                           storageProvider: 'GOOGLE',
-                          googleSpreadsheetUrl: googleSpreadsheetUrlInput.trim(),
                           googleDriveFolderUrl: googleDriveFolderUrlInput.trim()
                         };
                         updateSettings(newSettings);
                         await cloudApiService.saveCentralSettings(newSettings);
-                        showSuccess('Konfigurasi Google Cloud Storage via Vercel Backend berhasil disimpan!');
+                        showSuccess('Konfigurasi Cloud Storage & Database berhasil disimpan!');
                         if (refreshUsersFromCloud) refreshUsersFromCloud();
                         if (refreshAttendanceFromCloud) refreshAttendanceFromCloud();
                       }}
@@ -1904,7 +1904,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                         boxShadow: '0 3px 10px rgba(5, 150, 105, 0.25)'
                       }}
                     >
-                      Simpan Konfigurasi Google Storage
+                      Simpan Konfigurasi Storage
                     </button>
 
                     <button
@@ -1913,13 +1913,13 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                         setTestingGoogleCloud(true);
                         try {
                           const res = await cloudApiService.testGoogleIntegration(
-                            googleSpreadsheetUrlInput.trim(),
+                            '',
                             googleDriveFolderUrlInput.trim()
                           );
                           if (res.success) {
-                            showSuccess(res.message, 'KONEKSI GOOGLE CLOUD BERHASIL');
+                            showSuccess(res.message, 'UJI KONEKSI DATABASE BERHASIL');
                           } else {
-                            showError(res.message, 'KONEKSI GOOGLE CLOUD GAGAL');
+                            showError(res.message, 'UJI KONEKSI DATABASE GAGAL');
                           }
                         } catch (err) {
                           showError(`Koneksi gagal: ${err.message}`, 'KONEKSI GAGAL');
@@ -1938,7 +1938,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                         cursor: 'pointer'
                       }}
                     >
-                      {testingGoogleCloud ? 'Menguji...' : '🧪 Uji Koneksi Google Cloud Storage'}
+                      {testingGoogleCloud ? 'Menguji Database...' : '🧪 Uji Koneksi Vercel Postgres & Drive'}
                     </button>
                   </div>
                 </div>

@@ -147,10 +147,19 @@ export default async function handler(req, res) {
     // 1. ACTION: Test Connection
     if (action === 'TEST_GOOGLE' || action === 'TEST_CONNECTION' || action === 'TEST_POSTGRES') {
       let isPostgresReady = false;
+      let userCount = memoryUsers.length;
+      let attendanceCount = memoryAttendance.length;
+
       if (sql) {
         try {
           const testRes = await sql`SELECT NOW() as now`;
           isPostgresReady = !!testRes && testRes.length > 0;
+          if (isPostgresReady) {
+            const uCountRes = await sql`SELECT COUNT(*)::int as count FROM users`;
+            const aCountRes = await sql`SELECT COUNT(*)::int as count FROM attendance`;
+            userCount = uCountRes[0]?.count ?? 0;
+            attendanceCount = aCountRes[0]?.count ?? 0;
+          }
         } catch (e) {
           console.warn('Postgres ping error:', e);
         }
@@ -159,10 +168,12 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: true,
         message: isPostgresReady
-          ? 'Koneksi Vercel Postgres Database & Google Drive Storage Aktif!'
-          : 'Serverless Backend Aktif (Mode In-Memory Fallback). Silakan connect Vercel Postgres di dashboard Vercel.',
+          ? `✅ Vercel Postgres (Neon) Terhubung! (${userCount} Akun, ${attendanceCount} Riwayat Presensi)`
+          : 'Serverless Backend Aktif (Mode In-Memory). Sambungkan Postgres di dashboard Vercel.',
         databaseEngine: isPostgresReady ? 'VERCEL_POSTGRES_NEON' : 'IN_MEMORY_SERVERLESS',
         postgresConnected: isPostgresReady,
+        userCount,
+        attendanceCount,
         timestamp: new Date().toISOString()
       });
     }

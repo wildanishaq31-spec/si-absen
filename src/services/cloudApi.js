@@ -46,7 +46,9 @@ export const cloudApiService = {
           success: true,
           message: data.message || 'Koneksi Vercel Postgres Database & Google Drive Storage Berhasil!',
           databaseEngine: data.databaseEngine,
-          postgresConnected: data.postgresConnected
+          postgresConnected: data.postgresConnected,
+          userCount: data.userCount,
+          attendanceCount: data.attendanceCount
         };
       }
     } catch (err) {

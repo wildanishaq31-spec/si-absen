@@ -97,12 +97,18 @@ function AppContent() {
 
     return isViewingAdmin ? (
       <AdminDashboard 
-        onSwitchToUser={() => navigateTo('/pegawai/login')}
+        onSwitchToUser={() => {
+          logout();
+          navigateTo('/pegawai/login');
+        }}
         onLogout={handleLogout}
       />
     ) : (
       <UserDashboard 
-        onSwitchToAdmin={() => navigateTo('/administrator/login')}
+        onSwitchToAdmin={() => {
+          logout();
+          navigateTo('/administrator/login');
+        }}
         onLogout={handleLogout}
       />
     );

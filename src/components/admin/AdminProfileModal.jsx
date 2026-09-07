@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, User, Mail, Lock, Key, Eye, EyeOff, 
   X, RotateCcw, HelpCircle, CheckCircle2, AlertCircle 
@@ -19,6 +19,17 @@ export function AdminProfileModal({ isOpen, onClose }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (currentUser && isOpen) {
+      setName(currentUser.name || 'Administrator SI-ABSEN');
+      setEmail(currentUser.email || 'admin@siabsen.go.id');
+      setNewPassword('');
+      setConfirmPassword('');
+      setErrorMsg('');
+      setSuccessMsg('');
+    }
+  }, [currentUser, isOpen]);
 
   if (!isOpen) return null;
 
@@ -182,7 +193,7 @@ export function AdminProfileModal({ isOpen, onClose }) {
         </div>
 
         {/* Modal Body */}
-        <form onSubmit={handleSubmit} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px', maxHeight: '80vh', overflowY: 'auto' }}>
+        <form onSubmit={handleSaveProfile} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px', maxHeight: '80vh', overflowY: 'auto' }}>
           
           {errorMsg && (
             <div style={{ backgroundColor: '#FEE2E2', border: '1px solid #FECACA', color: '#DC2626', padding: '10px 14px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -401,7 +412,7 @@ export function AdminProfileModal({ isOpen, onClose }) {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               style={{
                 background: 'linear-gradient(135deg, #00838F, #006064)',
                 border: 'none',
@@ -414,7 +425,7 @@ export function AdminProfileModal({ isOpen, onClose }) {
                 boxShadow: '0 4px 12px rgba(0, 131, 143, 0.3)'
               }}
             >
-              {loading ? 'Menyimpan...' : '💾 Simpan Perubahan'}
+              {isSubmitting ? 'Menyimpan...' : '💾 Simpan Perubahan'}
             </button>
           </div>
 

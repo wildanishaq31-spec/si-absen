@@ -4,9 +4,9 @@ import { storageService } from '../services/storage';
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(() => storageService.getSession());
+  const [users, setUsers] = useState(() => storageService.getUsers());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const loadedUsers = storageService.getUsers();
@@ -14,9 +14,11 @@ export function AuthProvider({ children }) {
 
     const activeSession = storageService.getSession();
     if (activeSession) {
-      setCurrentUser(activeSession);
+      // Sync active session if user data was updated in background
+      const syncedUser = loadedUsers.find(u => u.id === activeSession.id) || activeSession;
+      setCurrentUser(syncedUser);
+      storageService.saveSession(syncedUser);
     }
-    // Auto-login removed. User must login explicitly to create an activeSession.
     setLoading(false);
   }, []);
 

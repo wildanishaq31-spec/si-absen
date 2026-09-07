@@ -82,7 +82,7 @@ function AppContent() {
       return (
         <RegisterPage 
           onNavigateToLogin={() => navigateTo('/pegawai/login')}
-          onRegisterSuccess={() => navigateTo('/pegawai/login')}
+          onRegisterSuccess={() => navigateTo('/pegawai/dashboard')}
         />
       );
     }

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { storageService } from '../services/storage';
+import { storageService, INITIAL_USERS } from '../services/storage';
 import { cloudApiService } from '../services/cloudApi';
 import { hashPassword, verifyPassword } from '../utils/crypto';
 
@@ -14,30 +14,31 @@ export function AuthProvider({ children }) {
     const settings = storageService.getSettings();
     try {
       const cloudData = await cloudApiService.fetchAllData(settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
-      if (cloudData && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
-        const localUsers = storageService.getUsers();
-        const mergedMap = new Map();
-        localUsers.forEach(u => mergedMap.set(u.id || u.email, u));
-        cloudData.users.forEach(cu => {
-          const key = cu.id || cu.email;
-          const existing = mergedMap.get(key);
-          mergedMap.set(key, {
-            ...existing,
-            ...cu,
-            password: cu.password || existing?.password || '12345678'
-          });
-        });
+      if (cloudData && Array.isArray(cloudData.users)) {
+        // Authoritative server users list: Server + Default Admin
+        let mergedUsers = [...cloudData.users];
+        
+        // Ensure default admin exists
+        if (!mergedUsers.some(u => u.role === 'admin')) {
+          mergedUsers.unshift(INITIAL_USERS[0]);
+        }
 
-        const mergedUsers = Array.from(mergedMap.values());
         storageService.saveUsers(mergedUsers);
         setUsers(mergedUsers);
 
+        // Check if active session is still valid in mergedUsers
         const currentSession = storageService.getSession();
         if (currentSession) {
-          const updatedSession = mergedUsers.find(u => u.id === currentSession.id || u.email === currentSession.email);
-          if (updatedSession) {
-            setCurrentUser(updatedSession);
-            storageService.saveSession(updatedSession);
+          const isValidSession = mergedUsers.find(
+            u => (u.id && u.id === currentSession.id) || (u.email && u.email?.toLowerCase() === currentSession.email?.toLowerCase())
+          );
+          if (isValidSession) {
+            setCurrentUser(isValidSession);
+            storageService.saveSession(isValidSession);
+          } else {
+            // User was removed/reset from database! Clear active session
+            setCurrentUser(null);
+            storageService.clearSession();
           }
         }
       }
@@ -82,6 +83,9 @@ export function AuthProvider({ children }) {
   };
 
   const login = async (identifier, password, requiredRole = null) => {
+    // 1. Refresh latest users from cloud/database first to enforce authoritative check
+    await refreshUsersFromCloud();
+
     const allUsers = storageService.getUsers();
     const cleanId = (identifier || '').toLowerCase().trim();
     
@@ -91,7 +95,10 @@ export function AuthProvider({ children }) {
     );
 
     if (!found) {
-      return { success: false, message: 'Email / NIP atau kata sandi tidak sesuai.' };
+      return { 
+        success: false, 
+        message: 'Akun pegawai tidak ditemukan dalam database. Silakan daftar akun baru terlebih dahulu.' 
+      };
     }
 
     // Verify cryptographic SHA-256 hash (or plaintext fallback)
@@ -110,6 +117,9 @@ export function AuthProvider({ children }) {
   };
 
   const register = async ({ name, email, password, nip, skpd }) => {
+    // Refresh latest users from cloud first
+    await refreshUsersFromCloud();
+
     const allUsers = storageService.getUsers();
     
     if (!name?.trim()) {
@@ -158,9 +168,13 @@ export function AuthProvider({ children }) {
     const updatedUsers = [...allUsers, saved];
     setUsers(updatedUsers);
 
+    // Auto-save session to phone cache so employee stays logged in permanently
+    setCurrentUser(saved);
+    storageService.saveSession(saved);
+
     // Sync directly to Google Spreadsheet & Cloud Backend
     const settings = storageService.getSettings();
-    cloudApiService.syncUser(saved, settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
+    await cloudApiService.syncUser(saved, settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
 
     return { success: true, user: saved };
   };

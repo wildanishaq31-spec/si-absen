@@ -180,32 +180,57 @@ export function RegisterPage({ onNavigateToLogin, onRegisterSuccess }) {
           </div>
 
           <p style={{ fontSize: '0.82rem', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
-            Silakan kembali ke halaman login untuk masuk menggunakan alamat <strong>Email</strong> atau <strong>NIP</strong> serta kata sandi yang telah Anda buat.
+            Akun Anda telah otomatis tersimpan di HP ini. Anda dapat langsung menuju dashboard presensi harian tanpa perlu login ulang tiap hari.
           </p>
 
-          {/* Primary Action Button: Kembali ke Login */}
+          {/* Primary Action Button: Buka Dashboard Langsung */}
           <button
-            onClick={onNavigateToLogin}
+            onClick={() => {
+              if (onRegisterSuccess) onRegisterSuccess();
+              else if (onNavigateToLogin) onNavigateToLogin();
+            }}
             style={{
               width: '100%',
-              background: 'linear-gradient(135deg, #00838F, #006064)',
+              background: 'linear-gradient(135deg, #059669, #047857)',
               color: '#FFFFFF',
               border: 'none',
               borderRadius: '12px',
               padding: '13px',
               fontWeight: 800,
-              fontSize: '0.92rem',
+              fontSize: '0.94rem',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(0, 131, 143, 0.35)',
+              boxShadow: '0 4px 14px rgba(5, 150, 105, 0.35)',
               marginTop: '4px',
               transition: 'transform 0.15s ease'
             }}
           >
-            <ArrowLeft size={18} /> Kembali ke Halaman Login
+            <CheckCircle2 size={18} /> Buka Dashboard Presensi
+          </button>
+
+          {/* Secondary Action: Kembali ke Login */}
+          <button
+            onClick={onNavigateToLogin}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              color: '#00838F',
+              border: '1.5px solid #CCFBF1',
+              borderRadius: '12px',
+              padding: '11px',
+              fontWeight: 700,
+              fontSize: '0.86rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            <ArrowLeft size={16} /> Ke Halaman Login
           </button>
         </div>
       </div>

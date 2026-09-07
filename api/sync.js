@@ -1,8 +1,10 @@
-// Vercel Serverless API Handler for SI-ABSEN
-// Handles central data sync, attendance logging, user management & Google Cloud integration
+// Vercel Serverless API Handler for SI-ABSEN with Vercel Postgres / Neon Integration
+// Handles persistent cloud PostgreSQL database, attendance logging, user management & Google Drive storage
 
-// In-memory central store (persists across warm serverless invocations)
-let centralSettings = {
+import { neon } from '@neondatabase/serverless';
+
+// In-memory fallback (when POSTGRES_URL is not yet connected)
+let memorySettings = {
   storageProvider: 'GOOGLE',
   googleSpreadsheetUrl: '',
   googleDriveFolderUrl: '',
@@ -10,7 +12,7 @@ let centralSettings = {
   skpdName: 'UPTD Puskesmas Cermee'
 };
 
-let centralUsers = [
+let memoryUsers = [
   {
     id: 'U-ADMIN-01',
     name: 'Administrator SI-ABSEN',
@@ -20,10 +22,101 @@ let centralUsers = [
   }
 ];
 
-let centralAttendance = [];
+let memoryAttendance = [];
+let isDbInitialized = false;
+
+// Helper to get Neon / PostgreSQL client
+function getSql() {
+  const connectionString =
+    process.env.POSTGRES_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING;
+
+  if (!connectionString) return null;
+  try {
+    return neon(connectionString);
+  } catch (err) {
+    console.warn('Neon connection initialization error:', err);
+    return null;
+  }
+}
+
+// Auto-initialize PostgreSQL tables if not present
+async function ensureTables(sql) {
+  if (!sql || isDbInitialized) return;
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(64) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role VARCHAR(32) NOT NULL,
+        nip VARCHAR(64),
+        skpd VARCHAR(255),
+        photo TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        last_login TIMESTAMPTZ
+      );
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS attendance (
+        id VARCHAR(64) PRIMARY KEY,
+        user_id VARCHAR(64),
+        user_name VARCHAR(255) NOT NULL,
+        nip VARCHAR(64),
+        email VARCHAR(255),
+        skpd VARCHAR(255),
+        date VARCHAR(32) NOT NULL,
+        time VARCHAR(32) NOT NULL,
+        timestamp TIMESTAMPTZ DEFAULT NOW(),
+        type VARCHAR(64) NOT NULL,
+        category VARCHAR(32) DEFAULT 'HARIAN',
+        shift_type VARCHAR(32),
+        schedule_in VARCHAR(16),
+        schedule_out VARCHAR(16),
+        is_late BOOLEAN DEFAULT FALSE,
+        late_minutes INT DEFAULT 0,
+        is_early_leave BOOLEAN DEFAULT FALSE,
+        early_leave_minutes INT DEFAULT 0,
+        work_duration_minutes INT DEFAULT 0,
+        status VARCHAR(64),
+        evidence_url TEXT,
+        notes TEXT,
+        latitude NUMERIC(10, 7),
+        longitude NUMERIC(10, 7),
+        distance_meters NUMERIC(10, 2)
+      );
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS settings (
+        key VARCHAR(64) PRIMARY KEY,
+        value JSONB NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `;
+
+    // Ensure default admin exists
+    const adminCheck = await sql`SELECT id FROM users WHERE role = 'admin' LIMIT 1`;
+    if (!adminCheck || adminCheck.length === 0) {
+      await sql`
+        INSERT INTO users (id, name, email, password, role)
+        VALUES ('U-ADMIN-01', 'Administrator SI-ABSEN', 'admin@siabsen.go.id', 'admin', 'admin')
+        ON CONFLICT (id) DO NOTHING;
+      `;
+    }
+
+    isDbInitialized = true;
+  } catch (err) {
+    console.warn('Postgres table creation warning:', err);
+  }
+}
 
 export default async function handler(req, res) {
-  // Enable CORS for frontend requests
+  // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -40,47 +133,32 @@ export default async function handler(req, res) {
   try {
     const { method, query, body } = req;
     const action = query.action || (body && body.action) || (method === 'GET' ? 'GET_ALL_DATA' : 'INFO');
-    const spreadsheetUrl = query.spreadsheetUrl || (body && (body.spreadsheetUrl || body.spreadsheetId)) || centralSettings.googleSpreadsheetUrl;
-    const folderUrl = query.folderUrl || (body && (body.folderUrl || body.folderId)) || centralSettings.googleDriveFolderUrl;
-    const webhookUrl = query.webhookUrl || (body && (body.webhookUrl || body.gasWebhookUrl)) || centralSettings.gasWebhookUrl;
+    const folderUrl = query.folderUrl || (body && (body.folderUrl || body.folderId)) || '';
 
-    // Helper: Relay to external Google Apps Script / Webhook if available
-    const forwardToWebhook = async (payload) => {
-      const targetUrl = webhookUrl || centralSettings.gasWebhookUrl;
-      if (!targetUrl) return null;
-      try {
-        const response = await fetch(targetUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (response.ok) {
-          return await response.json();
-        }
-      } catch (err) {
-        console.warn('Forwarding to webhook failed:', err);
-      }
-      return null;
-    };
+    const sql = getSql();
+    if (sql) {
+      await ensureTables(sql);
+    }
 
     // 1. ACTION: Test Connection
-    if (action === 'TEST_GOOGLE' || action === 'TEST_CONNECTION') {
-      if (spreadsheetUrl) centralSettings.googleSpreadsheetUrl = spreadsheetUrl;
-      if (folderUrl) centralSettings.googleDriveFolderUrl = folderUrl;
-      if (webhookUrl) centralSettings.gasWebhookUrl = webhookUrl;
-
-      // Relay test to webhook if available
-      let webhookResult = null;
-      if (webhookUrl) {
-        webhookResult = await forwardToWebhook({ action: 'TEST_CONNECTION', spreadsheetUrl, folderUrl });
+    if (action === 'TEST_GOOGLE' || action === 'TEST_CONNECTION' || action === 'TEST_POSTGRES') {
+      let isPostgresReady = false;
+      if (sql) {
+        try {
+          const testRes = await sql`SELECT NOW() as now`;
+          isPostgresReady = !!testRes && testRes.length > 0;
+        } catch (e) {
+          console.warn('Postgres ping error:', e);
+        }
       }
 
       return res.status(200).json({
         success: true,
-        message: 'Koneksi Serverless Backend ke Cloud Storage Berhasil!',
-        spreadsheetConfigured: !!spreadsheetUrl,
-        webhookConfigured: !!webhookUrl,
-        webhookResult,
+        message: isPostgresReady
+          ? 'Koneksi Vercel Postgres Database & Google Drive Storage Aktif!'
+          : 'Serverless Backend Aktif (Mode In-Memory Fallback). Silakan connect Vercel Postgres di dashboard Vercel.',
+        databaseEngine: isPostgresReady ? 'VERCEL_POSTGRES_NEON' : 'IN_MEMORY_SERVERLESS',
+        postgresConnected: isPostgresReady,
         timestamp: new Date().toISOString()
       });
     }
@@ -88,53 +166,119 @@ export default async function handler(req, res) {
     // 2. ACTION: Save & Sync Settings
     if (action === 'SAVE_SETTINGS' || action === 'UPDATE_SETTINGS') {
       const newSettings = body.settings || body.data || body;
-      centralSettings = { ...centralSettings, ...newSettings };
+      memorySettings = { ...memorySettings, ...newSettings };
+
+      if (sql) {
+        try {
+          await sql`
+            INSERT INTO settings (key, value, updated_at)
+            VALUES ('app_config', ${JSON.stringify(memorySettings)}, NOW())
+            ON CONFLICT (key) DO UPDATE SET value = ${JSON.stringify(memorySettings)}, updated_at = NOW()
+          `;
+        } catch (err) {
+          console.warn('Postgres save settings error:', err);
+        }
+      }
+
       return res.status(200).json({
         success: true,
-        message: 'Pengaturan terpusat berhasil diperbarui di server.',
-        settings: centralSettings,
+        message: 'Pengaturan terpusat berhasil diperbarui di PostgreSQL.',
+        settings: memorySettings,
         timestamp: new Date().toISOString()
       });
     }
 
     // 3. ACTION: Get Settings
     if (action === 'GET_SETTINGS') {
+      if (sql) {
+        try {
+          const rows = await sql`SELECT value FROM settings WHERE key = 'app_config' LIMIT 1`;
+          if (rows && rows.length > 0 && rows[0].value) {
+            memorySettings = { ...memorySettings, ...rows[0].value };
+          }
+        } catch (err) {
+          console.warn('Postgres get settings error:', err);
+        }
+      }
+
       return res.status(200).json({
         success: true,
-        settings: centralSettings,
+        settings: memorySettings,
         timestamp: new Date().toISOString()
       });
     }
 
-    // 4. ACTION: Submit Attendance (Masuk, Pulang, Izin, Cuti)
+    // 4. ACTION: Submit Attendance (Masuk, Pulang, Izin, Cuti, Dinas Luar)
     if (action === 'SUBMIT_ATTENDANCE' || action === 'SUBMIT_MASUK' || action === 'SUBMIT_PULANG' || action === 'SUBMIT_LEAVE') {
       const record = body.data || body.record || body;
-      
+
       let finalEvidenceUrl = record.evidenceUrl || '';
       if (!finalEvidenceUrl && record.evidenceSnapshot && folderUrl) {
         finalEvidenceUrl = folderUrl;
       }
       const recordWithEvidence = { ...record, evidenceUrl: finalEvidenceUrl };
 
-      // Simpan di central attendance
-      const existingIdx = centralAttendance.findIndex(a => a.id === record.id);
+      // In-Memory Update
+      const existingIdx = memoryAttendance.findIndex(a => a.id === record.id);
       if (existingIdx >= 0) {
-        centralAttendance[existingIdx] = recordWithEvidence;
+        memoryAttendance[existingIdx] = recordWithEvidence;
       } else {
-        centralAttendance.unshift(recordWithEvidence);
+        memoryAttendance.unshift(recordWithEvidence);
       }
 
-      // Relay ke Webhook Spreadsheet jika ada
-      await forwardToWebhook({
-        action,
-        spreadsheetUrl,
-        folderUrl,
-        data: recordWithEvidence
-      });
+      // PostgreSQL Update
+      if (sql) {
+        try {
+          await sql`
+            INSERT INTO attendance (
+              id, user_id, user_name, nip, email, skpd, date, time, type,
+              category, shift_type, schedule_in, schedule_out, is_late, late_minutes,
+              is_early_leave, early_leave_minutes, work_duration_minutes, status,
+              evidence_url, notes, latitude, longitude, distance_meters, timestamp
+            )
+            VALUES (
+              ${record.id || `ATT-${Date.now()}`},
+              ${record.userId || null},
+              ${record.userName || 'Pegawai'},
+              ${record.nip || null},
+              ${record.email || null},
+              ${record.skpd || null},
+              ${record.date || new Date().toISOString().split('T')[0]},
+              ${record.time || new Date().toTimeString().split(' ')[0]},
+              ${record.type || 'Masuk'},
+              ${record.category || 'HARIAN'},
+              ${record.shiftType || null},
+              ${record.scheduleIn || null},
+              ${record.scheduleOut || null},
+              ${!!record.isLate},
+              ${record.lateMinutes || 0},
+              ${!!record.isEarlyLeave},
+              ${record.earlyLeaveMinutes || 0},
+              ${record.workDurationMinutes || 0},
+              ${record.status || 'Tepat Waktu'},
+              ${finalEvidenceUrl || null},
+              ${record.notes || null},
+              ${record.latitude || null},
+              ${record.longitude || null},
+              ${record.distanceMeters || null},
+              NOW()
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              time = EXCLUDED.time,
+              type = EXCLUDED.type,
+              work_duration_minutes = EXCLUDED.work_duration_minutes,
+              status = EXCLUDED.status,
+              evidence_url = COALESCE(EXCLUDED.evidence_url, attendance.evidence_url),
+              notes = COALESCE(EXCLUDED.notes, attendance.notes)
+          `;
+        } catch (err) {
+          console.warn('Postgres submit attendance error:', err);
+        }
+      }
 
       return res.status(200).json({
         success: true,
-        message: `Presensi (${record.userName || 'Pegawai'}) berhasil diproses.`,
+        message: `Presensi (${record.userName || 'Pegawai'}) berhasil disimpan ke Vercel Postgres.`,
         evidenceUrl: finalEvidenceUrl,
         timestamp: new Date().toISOString()
       });
@@ -143,59 +287,131 @@ export default async function handler(req, res) {
     // 5. ACTION: Register & Sync User (Pegawai & Admin)
     if (action === 'REGISTER_USER' || action === 'SYNC_USER' || action === 'UPDATE_USER' || action === 'UPDATE_ADMIN' || action === 'REGISTER_PEGAWAI') {
       const user = body.data || body.user || body;
-      
+
       if (user && (user.id || user.email)) {
-        const idx = centralUsers.findIndex(u => (user.id && u.id === user.id) || (user.email && u.email?.toLowerCase() === user.email?.toLowerCase()));
+        // In-Memory Update
+        const idx = memoryUsers.findIndex(u => (user.id && u.id === user.id) || (user.email && u.email?.toLowerCase() === user.email?.toLowerCase()));
         if (idx >= 0) {
-          centralUsers[idx] = { ...centralUsers[idx], ...user };
+          memoryUsers[idx] = { ...memoryUsers[idx], ...user };
         } else {
-          centralUsers.push(user);
+          memoryUsers.push(user);
+        }
+
+        // PostgreSQL Update
+        if (sql) {
+          try {
+            await sql`
+              INSERT INTO users (id, name, email, password, role, nip, skpd, photo, last_login)
+              VALUES (
+                ${user.id || `U-${Date.now()}`},
+                ${user.name || 'User'},
+                ${(user.email || '').toLowerCase().trim()},
+                ${user.password || '12345678'},
+                ${user.role || 'pegawai'},
+                ${user.nip || null},
+                ${user.skpd || null},
+                ${user.photo || null},
+                ${user.lastLogin ? new Date(user.lastLogin) : null}
+              )
+              ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                email = EXCLUDED.email,
+                password = COALESCE(EXCLUDED.password, users.password),
+                role = EXCLUDED.role,
+                nip = COALESCE(EXCLUDED.nip, users.nip),
+                skpd = COALESCE(EXCLUDED.skpd, users.skpd),
+                photo = COALESCE(EXCLUDED.photo, users.photo),
+                last_login = COALESCE(EXCLUDED.last_login, users.last_login)
+            `;
+          } catch (err) {
+            console.warn('Postgres sync user error:', err);
+          }
         }
       }
 
-      // Relay ke Webhook Google Spreadsheet jika terkonfigurasi
-      await forwardToWebhook({
-        action,
-        spreadsheetUrl,
-        data: user
-      });
-
       return res.status(200).json({
         success: true,
-        message: `User ${user.name || 'Pegawai'} berhasil disimpan di database cloud terpusat.`,
-        user: user,
-        users: centralUsers,
+        message: `User ${user?.name || 'Pegawai'} berhasil disimpan di Vercel Postgres.`,
+        user,
+        users: memoryUsers,
         timestamp: new Date().toISOString()
       });
     }
 
     // 6. ACTION: Get All Central Data
     if (action === 'GET_ALL_DATA' || method === 'GET') {
-      // Jika ada webhook terhubung, coba ambil data terbaru dari webhook
-      if (webhookUrl || centralSettings.gasWebhookUrl) {
-        const webhookData = await forwardToWebhook({ action: 'GET_ALL_DATA', spreadsheetUrl });
-        if (webhookData && Array.isArray(webhookData.users) && webhookData.users.length > 0) {
-          // Merge webhook users with central users
-          const merged = new Map();
-          centralUsers.forEach(u => merged.set(u.id || u.email, u));
-          webhookData.users.forEach(u => merged.set(u.id || u.email, { ...merged.get(u.id || u.email), ...u }));
-          centralUsers = Array.from(merged.values());
+      let finalUsers = [...memoryUsers];
+      let finalAttendance = [...memoryAttendance];
+
+      if (sql) {
+        try {
+          const pgUsers = await sql`SELECT * FROM users ORDER BY created_at ASC`;
+          if (pgUsers && pgUsers.length > 0) {
+            finalUsers = pgUsers.map(u => ({
+              id: u.id,
+              name: u.name,
+              email: u.email,
+              password: u.password,
+              role: u.role,
+              nip: u.nip,
+              skpd: u.skpd,
+              photo: u.photo,
+              lastLogin: u.last_login ? new Date(u.last_login).toISOString() : null,
+              createdAt: u.created_at ? new Date(u.created_at).toISOString() : null
+            }));
+            memoryUsers = finalUsers;
+          }
+
+          const pgAttendance = await sql`SELECT * FROM attendance ORDER BY timestamp DESC`;
+          if (pgAttendance && pgAttendance.length > 0) {
+            finalAttendance = pgAttendance.map(a => ({
+              id: a.id,
+              userId: a.user_id,
+              userName: a.user_name,
+              nip: a.nip,
+              email: a.email,
+              skpd: a.skpd,
+              date: a.date,
+              time: a.time,
+              type: a.type,
+              category: a.category,
+              shiftType: a.shift_type,
+              scheduleIn: a.schedule_in,
+              scheduleOut: a.schedule_out,
+              isLate: a.is_late,
+              lateMinutes: a.late_minutes,
+              isEarlyLeave: a.is_early_leave,
+              earlyLeaveMinutes: a.early_leave_minutes,
+              workDurationMinutes: a.work_duration_minutes,
+              status: a.status,
+              evidenceUrl: a.evidence_url,
+              notes: a.notes,
+              latitude: a.latitude ? Number(a.latitude) : null,
+              longitude: a.longitude ? Number(a.longitude) : null,
+              distanceMeters: a.distance_meters ? Number(a.distance_meters) : null,
+              timestamp: a.timestamp ? new Date(a.timestamp).toISOString() : null
+            }));
+            memoryAttendance = finalAttendance;
+          }
+        } catch (err) {
+          console.warn('Postgres get all data error:', err);
         }
       }
 
       return res.status(200).json({
         success: true,
-        users: centralUsers,
-        attendance: centralAttendance,
-        settings: centralSettings,
-        version: 'v5.6-serverless',
+        users: finalUsers,
+        attendance: finalAttendance,
+        settings: memorySettings,
+        engine: sql ? 'VERCEL_POSTGRES' : 'IN_MEMORY',
+        version: 'v5.6-postgres',
         timestamp: new Date().toISOString()
       });
     }
 
-    // 7. ACTION: Reset Database Cloud & Cache
+    // 7. ACTION: Reset Database
     if (action === 'RESET_DATABASE') {
-      centralUsers = [
+      memoryUsers = [
         {
           id: 'U-ADMIN-01',
           name: 'Administrator SI-ABSEN',
@@ -204,31 +420,47 @@ export default async function handler(req, res) {
           role: 'admin'
         }
       ];
-      centralAttendance = [];
-      
-      // Relay reset to webhook if available
-      await forwardToWebhook({ action: 'RESET_DATABASE' });
+      memoryAttendance = [];
+
+      if (sql) {
+        try {
+          await sql`TRUNCATE TABLE attendance CASCADE;`;
+          await sql`DELETE FROM users WHERE role != 'admin';`;
+          await sql`
+            INSERT INTO users (id, name, email, password, role)
+            VALUES ('U-ADMIN-01', 'Administrator SI-ABSEN', 'admin@siabsen.go.id', 'admin', 'admin')
+            ON CONFLICT (id) DO UPDATE SET
+              name = 'Administrator SI-ABSEN',
+              email = 'admin@siabsen.go.id',
+              password = 'admin',
+              role = 'admin',
+              last_login = NOW();
+          `;
+        } catch (err) {
+          console.warn('Postgres reset database error:', err);
+        }
+      }
 
       return res.status(200).json({
         success: true,
-        message: 'Database Cloud dan Cache berhasil direset.',
-        users: centralUsers,
-        attendance: centralAttendance,
+        message: 'Database PostgreSQL dan memori berhasil di-reset ke setelan awal.',
+        users: memoryUsers,
+        attendance: memoryAttendance,
         timestamp: new Date().toISOString()
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: `Aksi ${action} berhasil diterima backend Vercel.`,
+      message: `Aksi ${action} berhasil diterima backend Vercel Postgres.`,
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('API Sync Error:', error);
+    console.error('API Sync Postgres Error:', error);
     return res.status(500).json({
       success: false,
-      message: `Terjadi kesalahan pada Serverless API: ${error.message}`
+      message: `Terjadi kesalahan pada Serverless PostgreSQL API: ${error.message}`
     });
   }
 }

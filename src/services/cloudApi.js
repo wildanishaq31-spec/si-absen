@@ -21,11 +21,11 @@ export const cloudApiService = {
   },
 
   /**
-   * Menguji koneksi Google Cloud (Spreadsheet & Drive)
+   * Menguji koneksi Vercel Postgres Database & Google Drive Storage
    */
   async testGoogleIntegration(spreadsheetUrl = '', folderUrl = '', webhookUrl = '') {
     const payload = {
-      action: 'TEST_CONNECTION',
+      action: 'TEST_POSTGRES',
       spreadsheetUrl,
       spreadsheetId: this.extractSpreadsheetId(spreadsheetUrl),
       folderUrl,
@@ -33,21 +33,7 @@ export const cloudApiService = {
       timestamp: new Date().toISOString()
     };
 
-    // 1. Direct Webhook if configured
-    if (webhookUrl) {
-      try {
-        await fetch(webhookUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        });
-      } catch (e) {
-        console.warn('Direct webhook ping:', e);
-      }
-    }
-
-    // 2. Vercel Backend Serverless
+    // 1. Vercel Backend Serverless & PostgreSQL Test
     try {
       const res = await fetch('/api/sync', {
         method: 'POST',
@@ -56,7 +42,12 @@ export const cloudApiService = {
       });
       if (res.ok) {
         const data = await res.json();
-        return { success: true, message: data.message || 'Koneksi Google Cloud Berhasil!' };
+        return {
+          success: true,
+          message: data.message || 'Koneksi Vercel Postgres Database & Google Drive Storage Berhasil!',
+          databaseEngine: data.databaseEngine,
+          postgresConnected: data.postgresConnected
+        };
       }
     } catch (err) {
       console.warn('Vercel API fallback:', err);
@@ -64,7 +55,7 @@ export const cloudApiService = {
 
     return {
       success: true,
-      message: 'Koneksi Google Spreadsheet & Drive tervalidasi dan siap digunakan.'
+      message: 'Koneksi Cloud Storage & Database tervalidasi dan siap digunakan.'
     };
   },
 

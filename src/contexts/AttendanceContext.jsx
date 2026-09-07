@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import { storageService } from '../services/storage';
 import { gasApiService } from '../services/gasApi';
@@ -16,9 +16,33 @@ export function AttendanceProvider({ children }) {
   const [settings, setSettings] = useState(storageService.getSettings());
   const [toast, setToast] = useState(null);
 
+  const refreshAttendanceFromCloud = useCallback(async () => {
+    const currentSettings = storageService.getSettings();
+    if (!currentSettings?.gasWebhookUrl) return;
+
+    try {
+      const cloudData = await gasApiService.fetchAllData(currentSettings.gasWebhookUrl, currentSettings.googleSpreadsheetUrl);
+      if (cloudData && Array.isArray(cloudData.attendance) && cloudData.attendance.length > 0) {
+        const localRecords = storageService.getAttendance();
+        const mergedMap = new Map();
+        localRecords.forEach(r => mergedMap.set(r.compositeKey || r.id, r));
+        cloudData.attendance.forEach(cr => {
+          const key = cr.compositeKey || cr.id;
+          mergedMap.set(key, { ...cr });
+        });
+        const mergedList = Array.from(mergedMap.values());
+        storageService.saveAttendance(mergedList);
+        setRecords(mergedList);
+      }
+    } catch (err) {
+      console.warn('Gagal sinkronisasi data presensi dari Google Sheets:', err);
+    }
+  }, []);
+
   useEffect(() => {
     setRecords(storageService.getAttendance());
-  }, []);
+    refreshAttendanceFromCloud();
+  }, [refreshAttendanceFromCloud]);
 
   const closeToast = () => setToast(null);
 
@@ -431,7 +455,8 @@ export function AttendanceProvider({ children }) {
         doCheckOut,
         submitLeave,
         handleExportExcel,
-        updateSettings
+        updateSettings,
+        refreshAttendanceFromCloud
       }}
     >
       {children}

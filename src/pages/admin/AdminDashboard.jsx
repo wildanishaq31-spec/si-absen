@@ -45,8 +45,29 @@ const WEEK_OPTIONS = [
 ];
 
 export function AdminDashboard({ onSwitchToUser, onLogout }) {
-  const { currentUser, users } = useAuth();
-  const { records, handleExportExcel, settings, updateSettings, showSuccess, showError, showWarning, showConfirm, showAlert, showToast } = useAttendance();
+  const { currentUser, users, refreshUsersFromCloud } = useAuth();
+  const { records, handleExportExcel, settings, updateSettings, refreshAttendanceFromCloud, showSuccess, showError, showWarning, showConfirm, showAlert, showToast } = useAttendance();
+
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+
+  // Auto-sync on mount
+  useEffect(() => {
+    if (refreshUsersFromCloud) refreshUsersFromCloud();
+    if (refreshAttendanceFromCloud) refreshAttendanceFromCloud();
+  }, [refreshUsersFromCloud, refreshAttendanceFromCloud]);
+
+  const handleSyncCloudData = async () => {
+    setIsSyncingCloud(true);
+    try {
+      if (refreshUsersFromCloud) await refreshUsersFromCloud();
+      if (refreshAttendanceFromCloud) await refreshAttendanceFromCloud();
+      showSuccess('Data Pegawai & Presensi berhasil disinkronkan dari Google Sheets!');
+    } catch (err) {
+      showError('Gagal sinkronisasi dari Google Sheets: ' + err.message);
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
 
   // Active Category: 'HARIAN' (Dinas Pagi) vs 'SHIFT' (Dinas Muter 3-Shift)
   const [attendanceCategory, setAttendanceCategory] = useState('HARIAN');
@@ -395,6 +416,31 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Sync Cloud Data Button */}
+            <button 
+              type="button"
+              onClick={handleSyncCloudData}
+              disabled={isSyncingCloud}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                border: '1.5px solid #00838F',
+                backgroundColor: '#E0F2F1',
+                color: '#006064',
+                fontSize: '0.84rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              title="Sinkronkan data pegawai & presensi dari Google Spreadsheet"
+            >
+              <RefreshCw size={15} className={isSyncingCloud ? 'animate-spin' : ''} />
+              <span>{isSyncingCloud ? 'Menyinkronkan...' : 'Sinkronkan Google Data'}</span>
+            </button>
+
             {/* Quick Export Excel Shortcut */}
             <button 
               className="btn-excel-export"
@@ -1862,15 +1908,28 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '6px' }}>
                     <button
                       type="button"
-                      onClick={() => {
-                        updateSettings({
+                      onClick={async () => {
+                        const newSettings = {
                           ...settings,
                           storageProvider: 'GOOGLE',
                           googleSpreadsheetUrl: googleSpreadsheetUrlInput.trim(),
                           googleDriveFolderUrl: googleDriveFolderUrlInput.trim(),
                           gasWebhookUrl: gasUrlInput.trim()
-                        });
+                        };
+                        updateSettings(newSettings);
                         showSuccess('Konfigurasi Google Cloud Storage berhasil disimpan!');
+                        
+                        // Auto-provision spreadsheet tabs & sync
+                        if (gasUrlInput.trim()) {
+                          gasApiService.testConnection(
+                            gasUrlInput.trim(),
+                            googleSpreadsheetUrlInput.trim(),
+                            googleDriveFolderUrlInput.trim()
+                          ).then(() => {
+                            if (refreshUsersFromCloud) refreshUsersFromCloud();
+                            if (refreshAttendanceFromCloud) refreshAttendanceFromCloud();
+                          }).catch(() => {});
+                        }
                       }}
                       style={{
                         backgroundColor: '#059669',

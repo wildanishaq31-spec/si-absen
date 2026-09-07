@@ -120,8 +120,8 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
               </div>
 
               <div className="profile-info">
-                <h2 className="profile-name">{currentUser?.name || 'AGUNG SISWOYO'}</h2>
-                <span className="profile-nip">{currentUser?.nip || '199407312025211093'}</span>
+                <h2 className="profile-name">{currentUser?.name || 'Pegawai'}</h2>
+                <span className="profile-nip">{currentUser?.nip || '-'}</span>
                 
                 <div className="skpd-badge">
                   <div className="skpd-icon-box">
@@ -156,10 +156,10 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
                     <div className="presence-details">
                       <span className="presence-type-label">Masuk</span>
                       <span className="presence-time" style={{ color: todayCheckIn ? '#0F172A' : '#94A3B8' }}>
-                        {todayCheckIn ? todayCheckIn.time : '07:42:53'}
+                        {todayCheckIn ? todayCheckIn.time : '-- : --'}
                       </span>
                       <span className="presence-tag">
-                        {todayCheckIn ? (todayCheckIn.isLate ? todayCheckIn.status : 'HARIAN_MASUK') : 'HARIAN_MASUK'}
+                        {todayCheckIn ? (todayCheckIn.isLate ? todayCheckIn.status : (todayCheckIn.type || 'MASUK')) : '-'}
                       </span>
                     </div>
                   </div>

@@ -20,7 +20,7 @@ export const gasApiService = {
   },
 
   /**
-   * Menguji koneksi ke Google Apps Script Web App
+   * Menguji koneksi ke Google Apps Script Web App dan membuat sheet otomatis
    */
   async testConnection(webhookUrl, spreadsheetUrl = '', folderUrl = '') {
     if (!webhookUrl) {
@@ -37,8 +37,7 @@ export const gasApiService = {
         timestamp: new Date().toISOString()
       };
 
-      // Fetch with no-cors or standard text output
-      const response = await fetch(webhookUrl, {
+      await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8'
@@ -48,7 +47,7 @@ export const gasApiService = {
 
       return {
         success: true,
-        message: 'Koneksi ke Google Apps Script Webhook terkirim dengan sukses! (Spreadsheet & Drive siap menerima data presensi).'
+        message: 'Koneksi ke Google Apps Script Webhook terkirim dengan sukses! Seluruh tab (Superadmin, Data Pegawai, Absen Masuk & Pulang) telah dibuat otomatis di Spreadsheet.'
       };
     } catch (err) {
       return {
@@ -56,6 +55,40 @@ export const gasApiService = {
         message: `Gagal terhubung ke Web App Google Apps Script: ${err.message}`
       };
     }
+  },
+
+  /**
+   * Mengambil data terpusat (Pegawai, Admin, Presensi) dari Google Spreadsheet
+   */
+  async fetchAllData(webhookUrl, spreadsheetUrl = '') {
+    if (!webhookUrl) return null;
+
+    try {
+      const spId = this.extractSpreadsheetId(spreadsheetUrl);
+      const urlWithParam = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}action=GET_ALL_DATA&spreadsheetId=${encodeURIComponent(spId)}`;
+      
+      const res = await fetch(urlWithParam);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.warn('Gagal fetchAllData dari Google Sheets:', err);
+      return null;
+    }
+  },
+
+  /**
+   * Menyimpan / Registrasi Pegawai atau Admin ke Google Spreadsheet
+   */
+  async syncUser(webhookUrl, user, spreadsheetUrl = '') {
+    if (!webhookUrl) return { success: true, localOnly: true };
+
+    return this.syncToGoogleAppsScript(webhookUrl, {
+      action: 'REGISTER_USER',
+      spreadsheetUrl: spreadsheetUrl,
+      spreadsheetId: this.extractSpreadsheetId(spreadsheetUrl),
+      data: user
+    });
   },
 
   /**

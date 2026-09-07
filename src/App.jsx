@@ -27,6 +27,19 @@ function AppContent() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // Automatically redirect root URL '/' to '/pegawai/login' for employees by default
+  useEffect(() => {
+    if (currentPath === '/' || currentPath === '') {
+      if (!currentUser) {
+        navigateTo('/pegawai/login');
+      } else if (currentUser.role === 'admin') {
+        navigateTo('/administrator/dashboard');
+      } else {
+        navigateTo('/pegawai/dashboard');
+      }
+    }
+  }, [currentPath, currentUser]);
+
   // Safe navigation function updating URL and State
   const navigateTo = (path) => {
     if (typeof window !== 'undefined' && window.location.pathname !== path) {

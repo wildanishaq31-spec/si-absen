@@ -196,5 +196,55 @@ export const cloudApiService = {
       console.warn('Fetch all data from vercel error:', err);
     }
     return null;
+  },
+
+  /**
+   * Mengambil pengaturan terpusat (Spreadsheet URL, Webhook, SKPD) dari serverless backend
+   */
+  async fetchCentralSettings() {
+    try {
+      const res = await fetch('/api/sync?action=GET_SETTINGS');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) return data.settings;
+      }
+    } catch (err) {
+      console.warn('Fetch central settings error:', err);
+    }
+    return null;
+  },
+
+  /**
+   * Menyimpan pengaturan terpusat ke serverless backend
+   */
+  async saveCentralSettings(settings) {
+    try {
+      const res = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SAVE_SETTINGS', settings })
+      });
+      if (res.ok) return await res.json();
+    } catch (err) {
+      console.warn('Save central settings error:', err);
+    }
+    return null;
+  },
+
+  /**
+   * Me-reset database terpusat di serverless backend
+   */
+  async resetCentralDatabase() {
+    try {
+      const res = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'RESET_DATABASE' })
+      });
+      if (res.ok) return await res.json();
+    } catch (err) {
+      console.warn('Reset central database error:', err);
+    }
+    return null;
   }
 };

@@ -45,7 +45,7 @@ const WEEK_OPTIONS = [
 ];
 
 export function AdminDashboard({ onSwitchToUser, onLogout }) {
-  const { currentUser, users, refreshUsersFromCloud } = useAuth();
+  const { currentUser, users, refreshUsersFromCloud, resetLocalAndCloudData } = useAuth();
   const { records, handleExportExcel, settings, updateSettings, refreshAttendanceFromCloud, showSuccess, showError, showWarning, showConfirm, showAlert, showToast } = useAttendance();
 
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
@@ -1878,7 +1878,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '6px' }}>
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         const newSettings = {
                           ...settings,
                           storageProvider: 'GOOGLE',
@@ -1886,7 +1886,8 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                           googleDriveFolderUrl: googleDriveFolderUrlInput.trim()
                         };
                         updateSettings(newSettings);
-                        showSuccess('Konfigurasi Google Cloud Storage via Vercel Backend berhasil disimpan!');
+                        await cloudApiService.saveCentralSettings(newSettings);
+                        showSuccess('Konfigurasi Google Cloud Storage via Vercel Backend berhasil disimpan ke Cloud & Perangkat!');
                         if (refreshUsersFromCloud) refreshUsersFromCloud();
                         if (refreshAttendanceFromCloud) refreshAttendanceFromCloud();
                       }}
@@ -2114,16 +2115,16 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                   onClick={() => {
                     showConfirm({
                       type: 'warning',
-                      title: 'RESET SELURUH DATA',
-                      message: 'Apakah Anda yakin ingin menghapus SELURUH data dummy pegawai dan presensi?\n\nTindakan ini akan mengosongkan sistem agar Anda dapat menambah pegawai dari 0.',
+                      title: 'RESET SELURUH DATA & CACHE',
+                      message: 'Apakah Anda yakin ingin menghapus data pegawai dan riwayat presensi di penyimpanan lokal & server cloud?\n\nTindakan ini akan mengosongkan sistem agar Anda dapat mendaftarkan ulang pegawai dari 0.',
                       confirmText: 'YA, RESET SEMUA',
                       cancelText: 'BATAL',
-                      onConfirm: () => {
-                        storageService.resetAllData();
-                        showSuccess('Seluruh data dummy berhasil dihapus! Halaman akan dimuat ulang.', 'RESET BERHASIL');
+                      onConfirm: async () => {
+                        await resetLocalAndCloudData();
+                        showSuccess('Seluruh data pegawai & cache berhasil direset! Halaman akan dimuat ulang.', 'RESET BERHASIL');
                         setTimeout(() => {
                           window.location.reload();
-                        }, 1200);
+                        }, 1000);
                       }
                     });
                   }}

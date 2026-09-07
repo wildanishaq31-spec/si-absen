@@ -193,6 +193,31 @@ export default async function handler(req, res) {
       });
     }
 
+    // 7. ACTION: Reset Database Cloud & Cache
+    if (action === 'RESET_DATABASE') {
+      centralUsers = [
+        {
+          id: 'U-ADMIN-01',
+          name: 'Administrator SI-ABSEN',
+          email: 'admin@siabsen.go.id',
+          password: 'admin',
+          role: 'admin'
+        }
+      ];
+      centralAttendance = [];
+      
+      // Relay reset to webhook if available
+      await forwardToWebhook({ action: 'RESET_DATABASE' });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Database Cloud dan Cache berhasil direset.',
+        users: centralUsers,
+        attendance: centralAttendance,
+        timestamp: new Date().toISOString()
+      });
+    }
+
     return res.status(200).json({
       success: true,
       message: `Aksi ${action} berhasil diterima backend Vercel.`,

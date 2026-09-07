@@ -47,6 +47,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    // 1. Fetch central settings from backend serverless so all devices are in sync
+    cloudApiService.fetchCentralSettings().then(centralSettings => {
+      if (centralSettings) {
+        const localSettings = storageService.getSettings();
+        storageService.saveSettings({ ...localSettings, ...centralSettings });
+      }
+    });
+
     const loadedUsers = storageService.getUsers();
     setUsers(loadedUsers);
 
@@ -60,6 +68,18 @@ export function AuthProvider({ children }) {
     refreshUsersFromCloud();
     setLoading(false);
   }, [refreshUsersFromCloud]);
+
+  const resetLocalAndCloudData = async () => {
+    try {
+      await cloudApiService.resetCentralDatabase();
+    } catch (e) {
+      console.warn('Backend reset warning:', e);
+    }
+    const resetResult = storageService.resetAllData();
+    setUsers(resetResult.users);
+    setCurrentUser(null);
+    return { success: true };
+  };
 
   const login = async (identifier, password, requiredRole = null) => {
     const allUsers = storageService.getUsers();
@@ -203,7 +223,8 @@ export function AuthProvider({ children }) {
         switchUser,
         updateUser,
         deleteUser,
-        refreshUsersFromCloud
+        refreshUsersFromCloud,
+        resetLocalAndCloudData
       }}
     >
       {children}

@@ -69,11 +69,11 @@ export default async function handler(req, res) {
     }
 
     // 3. ACTION: Register / Sync Pegawai & Superadmin
-    if (action === 'REGISTER_USER' || action === 'SYNC_USER' || action === 'UPDATE_USER') {
+    if (action === 'REGISTER_USER' || action === 'SYNC_USER' || action === 'UPDATE_USER' || action === 'UPDATE_ADMIN' || action === 'REGISTER_PEGAWAI') {
       const user = body.data || body.user || body;
       return res.status(200).json({
         success: true,
-        message: `User ${user.name} (${user.role || 'pegawai'}) berhasil disinkronkan ke Database Cloud.`,
+        message: `User ${user.name || 'User'} (${user.role || 'pegawai'}) berhasil disinkronkan ke Database Cloud.`,
         user: user,
         timestamp: new Date().toISOString()
       });

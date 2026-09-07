@@ -7,7 +7,7 @@ const STORAGE_KEYS = {
   ACTIVE_SESSION: 'si_absen_session_v2'
 };
 
-// Clean Default Users: ONLY Administrator (No dummy employees)
+// Clean Default Users: ONLY Administrator (No employee NIP/SKPD on Admin)
 export const INITIAL_USERS = [
   {
     id: 'U-ADMIN-01',
@@ -15,8 +15,6 @@ export const INITIAL_USERS = [
     email: 'admin@siabsen.go.id',
     password: 'admin',
     role: 'admin',
-    nip: '198501012010011001',
-    skpd: 'Dinas Kesehatan Kab. Bondowoso',
     photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
   }
 ];

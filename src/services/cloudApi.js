@@ -117,11 +117,31 @@ export const cloudApiService = {
     const isAdmin = user.role === 'admin';
     const action = isAdmin ? 'UPDATE_ADMIN' : 'REGISTER_PEGAWAI';
 
+    // Format data: Akun Superadmin tidak memiliki kolom NIP dan SKPD (hanya ID_ADMIN, NAMA_LENGKAP, EMAIL, PASSWORD, ROLE, TERAKHIR_LOGIN)
+    let formattedData;
+    if (isAdmin) {
+      formattedData = {
+        id: user.id || 'U-ADMIN-01',
+        name: user.name,
+        email: user.email,
+        password: user.password,
+        role: 'admin',
+        lastLogin: new Date().toISOString(),
+        columns: ['ID_ADMIN', 'NAMA_LENGKAP', 'EMAIL', 'PASSWORD', 'ROLE', 'TERAKHIR_LOGIN']
+      };
+    } else {
+      formattedData = {
+        ...user,
+        role: 'pegawai',
+        columns: ['ID_PEGAWAI', 'NAMA_LENGKAP', 'EMAIL', 'PASSWORD', 'NIP', 'SKPD', 'ROLE', 'TANGGAL_DAFTAR']
+      };
+    }
+
     const payload = {
       action,
       spreadsheetUrl,
       spreadsheetId: this.extractSpreadsheetId(spreadsheetUrl),
-      data: user
+      data: formattedData
     };
 
     // 1. Direct Webhook sync ke Google Sheets (tab Superadmin atau Data Pegawai)

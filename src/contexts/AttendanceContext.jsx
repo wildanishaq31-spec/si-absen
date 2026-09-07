@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import { storageService } from '../services/storage';
-import { gasApiService } from '../services/gasApi';
+import { cloudApiService } from '../services/cloudApi';
 import { rustfsService } from '../services/rustfsService';
 import { exportAttendanceExcel } from '../services/excelService';
 import { evaluateCheckIn, evaluateCheckOut, evaluateShiftCheckIn, evaluateShiftCheckOut, calculateWorkDuration } from '../services/attendanceCore';
@@ -18,24 +18,24 @@ export function AttendanceProvider({ children }) {
 
   const refreshAttendanceFromCloud = useCallback(async () => {
     const currentSettings = storageService.getSettings();
-    if (!currentSettings?.gasWebhookUrl) return;
-
-    try {
-      const cloudData = await gasApiService.fetchAllData(currentSettings.gasWebhookUrl, currentSettings.googleSpreadsheetUrl);
-      if (cloudData && Array.isArray(cloudData.attendance) && cloudData.attendance.length > 0) {
-        const localRecords = storageService.getAttendance();
-        const mergedMap = new Map();
-        localRecords.forEach(r => mergedMap.set(r.compositeKey || r.id, r));
-        cloudData.attendance.forEach(cr => {
-          const key = cr.compositeKey || cr.id;
-          mergedMap.set(key, { ...cr });
-        });
-        const mergedList = Array.from(mergedMap.values());
-        storageService.saveAttendance(mergedList);
-        setRecords(mergedList);
+    if (currentSettings?.storageProvider === 'GOOGLE' && currentSettings?.googleSpreadsheetUrl) {
+      try {
+        const cloudData = await cloudApiService.fetchAllData(currentSettings.googleSpreadsheetUrl);
+        if (cloudData && Array.isArray(cloudData.attendance) && cloudData.attendance.length > 0) {
+          const localRecords = storageService.getAttendance();
+          const mergedMap = new Map();
+          localRecords.forEach(r => mergedMap.set(r.compositeKey || r.id, r));
+          cloudData.attendance.forEach(cr => {
+            const key = cr.compositeKey || cr.id;
+            mergedMap.set(key, { ...cr });
+          });
+          const mergedList = Array.from(mergedMap.values());
+          storageService.saveAttendance(mergedList);
+          setRecords(mergedList);
+        }
+      } catch (err) {
+        console.warn('Gagal sinkronisasi data presensi dari Cloud Backend:', err);
       }
-    } catch (err) {
-      console.warn('Gagal sinkronisasi data presensi dari Google Sheets:', err);
     }
   }, []);
 
@@ -166,13 +166,13 @@ export function AttendanceProvider({ children }) {
   const todayLeave = userTodayRecords.find(r => ['Izin', 'Sakit', 'Cuti', 'Dinas Luar'].includes(r.type));
 
   /**
-   * Helper to upload photo to RustFS if enabled, or generate cloud URL
+   * Helper to upload photo to RustFS (Mode Server) or generate Cloud URL
    */
   const processEvidencePhoto = async (evidenceDataUrl, fileNamePrefix) => {
     if (!evidenceDataUrl) return null;
 
-    // 1. If RustFS is enabled and configured, upload directly to RustFS
-    if (settings.rustfsEnabled && settings.rustfsEndpoint) {
+    // 1. Mode Server (RustFS Dedicated Storage)
+    if (settings.storageProvider === 'SERVER' && settings.rustfsEndpoint) {
       try {
         const cleanPrefix = (fileNamePrefix || 'presensi').replace(/[^a-zA-Z0-9_-]/g, '_');
         const fileName = `${cleanPrefix}_${Date.now()}.jpg`;
@@ -188,13 +188,16 @@ export function AttendanceProvider({ children }) {
           return res.url;
         }
       } catch (err) {
-        console.warn('Gagal upload ke RustFS, menggunakan fallback URL:', err);
+        console.warn('Gagal upload ke RustFS:', err);
       }
     }
 
-    // 2. Default Drive format URL
-    const driveMockId = '1' + Math.random().toString(36).substring(2, 12).toUpperCase();
-    return `https://drive.google.com/open?id=${driveMockId}`;
+    // 2. Mode Google Cloud Storage Folder
+    if (settings.googleDriveFolderUrl) {
+      return settings.googleDriveFolderUrl;
+    }
+
+    return null;
   };
 
   /**
@@ -242,6 +245,8 @@ export function AttendanceProvider({ children }) {
       timestamp: `${dateStr} ${timeStr}`,
       email: currentUser.email,
       userName: currentUser.name,
+      nip: currentUser.nip || '',
+      skpd: currentUser.skpd || '',
       type: recordType,
       category: isShift ? 'SHIFT' : 'HARIAN',
       shiftType: isShift ? (shiftType || 'PAGI') : null,
@@ -261,14 +266,9 @@ export function AttendanceProvider({ children }) {
     const updated = storageService.addAttendance(newRecord);
     setRecords([newRecord, ...records.filter(r => r.id !== newRecord.id)]);
 
-    // Sync to Google Apps Script Webhook (Spreadsheet & Drive) if configured
-    if (settings.gasWebhookUrl) {
-      gasApiService.syncToGoogleAppsScript(settings.gasWebhookUrl, {
-        action: 'SUBMIT_MASUK',
-        spreadsheetUrl: settings.googleSpreadsheetUrl || '',
-        folderUrl: settings.googleDriveFolderUrl || '',
-        data: newRecord
-      });
+    // Sync to Cloud Vercel Backend
+    if (settings.storageProvider === 'GOOGLE' || settings.googleSpreadsheetUrl) {
+      cloudApiService.syncAttendance(newRecord, settings.googleSpreadsheetUrl, settings.googleDriveFolderUrl);
     }
 
     triggerSuccessAnimation();
@@ -334,6 +334,8 @@ export function AttendanceProvider({ children }) {
       timestamp: `${dateStr} ${timeStr}`,
       email: currentUser.email,
       userName: currentUser.name,
+      nip: currentUser.nip || '',
+      skpd: currentUser.skpd || '',
       type: recordType,
       category: isShift ? 'SHIFT' : 'HARIAN',
       shiftType: isShift ? (shiftType || matchingCheckIn?.shiftType || 'PAGI') : null,
@@ -355,14 +357,9 @@ export function AttendanceProvider({ children }) {
     const updated = storageService.addAttendance(newRecord);
     setRecords([newRecord, ...records.filter(r => r.id !== newRecord.id)]);
 
-    // Sync to Google Apps Script Webhook (Spreadsheet & Drive) if configured
-    if (settings.gasWebhookUrl) {
-      gasApiService.syncToGoogleAppsScript(settings.gasWebhookUrl, {
-        action: 'SUBMIT_PULANG',
-        spreadsheetUrl: settings.googleSpreadsheetUrl || '',
-        folderUrl: settings.googleDriveFolderUrl || '',
-        data: newRecord
-      });
+    // Sync to Cloud Vercel Backend
+    if (settings.storageProvider === 'GOOGLE' || settings.googleSpreadsheetUrl) {
+      cloudApiService.syncAttendance(newRecord, settings.googleSpreadsheetUrl, settings.googleDriveFolderUrl);
     }
 
     triggerSuccessAnimation();
@@ -387,6 +384,8 @@ export function AttendanceProvider({ children }) {
       timestamp: `${dateStr} ${timeStr}`,
       email: currentUser.email,
       userName: currentUser.name,
+      nip: currentUser.nip || '',
+      skpd: currentUser.skpd || '',
       type: type, // 'Izin', 'Sakit', 'Cuti', 'Dinas Luar'
       category: 'HARIAN',
       evidenceUrl: finalEvidenceUrl,
@@ -394,20 +393,18 @@ export function AttendanceProvider({ children }) {
       compositeKey: generateCompositeKey(currentUser.name, now, type),
       date: dateStr,
       time: timeStr,
-      status: `Pengajuan ${type}: ${reason || '-'}`,
-      leaveReason: reason,
+      status: type,
+      reason: reason || '',
       startDate: startDate || dateStr,
-      endDate: endDate || dateStr
+      endDate: endDate || dateStr,
+      location: `${currentUser.skpd} (${settings.officeLatitude || -7.780344}, ${settings.officeLongitude || 114.030344})`
     };
 
     const updated = storageService.addAttendance(newRecord);
     setRecords([newRecord, ...records.filter(r => r.id !== newRecord.id)]);
 
-    if (settings.gasWebhookUrl) {
-      gasApiService.syncToGoogleAppsScript(settings.gasWebhookUrl, {
-        action: 'SUBMIT_LEAVE',
-        data: newRecord
-      });
+    if (settings.storageProvider === 'GOOGLE' || settings.googleSpreadsheetUrl) {
+      cloudApiService.syncAttendance(newRecord, settings.googleSpreadsheetUrl, settings.googleDriveFolderUrl);
     }
 
     triggerSuccessAnimation();

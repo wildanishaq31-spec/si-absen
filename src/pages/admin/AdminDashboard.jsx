@@ -16,7 +16,7 @@ import { AdminEmployeeData } from '../../components/admin/AdminEmployeeData';
 import { AdminProfileModal } from '../../components/admin/AdminProfileModal';
 import { AdminForceSetupModal } from '../../components/admin/AdminForceSetupModal';
 import { rustfsService } from '../../services/rustfsService';
-import { gasApiService } from '../../services/gasApi';
+import { cloudApiService } from '../../services/cloudApi';
 import { storageService } from '../../services/storage';
 
 const MONTH_OPTIONS = [
@@ -86,13 +86,11 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
 
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Dual Storage Mode: 'GOOGLE' (Google Sheets & Drive) vs 'SERVER' (Dedicated RustFS Storage Server)
+  // Dual Storage Mode: 'GOOGLE' (Google Sheets & Drive via Vercel Backend) vs 'SERVER' (Dedicated RustFS Storage Server)
   const [storageProviderInput, setStorageProviderInput] = useState(settings?.storageProvider || 'GOOGLE');
   const [googleSpreadsheetUrlInput, setGoogleSpreadsheetUrlInput] = useState(settings?.googleSpreadsheetUrl || '');
   const [googleDriveFolderUrlInput, setGoogleDriveFolderUrlInput] = useState(settings?.googleDriveFolderUrl || '');
-  const [gasUrlInput, setGasUrlInput] = useState(settings?.gasWebhookUrl || '');
-  const [testingGas, setTestingGas] = useState(false);
-  const [copiedGasCode, setCopiedGasCode] = useState(false);
+  const [testingGoogleCloud, setTestingGoogleCloud] = useState(false);
 
   const [rustfsEndpointInput, setRustfsEndpointInput] = useState(settings?.rustfsEndpoint || '');
   const [rustfsBucketInput, setRustfsBucketInput] = useState(settings?.rustfsBucket || 'bukti-presensi');
@@ -1840,7 +1838,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                         style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
                       />
                       <span style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '4px', display: 'block' }}>
-                        ID Spreadsheet: <code>{gasApiService.extractSpreadsheetId(googleSpreadsheetUrlInput) || '(Tempel URL Spreadsheet di atas)'}</code>
+                        ID Spreadsheet: <code>{cloudApiService.extractSpreadsheetId(googleSpreadsheetUrlInput) || '(Tempel URL Spreadsheet di atas)'}</code>
                       </span>
                     </div>
 
@@ -1858,78 +1856,39 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                         style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
                       />
                       <span style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '4px', display: 'block' }}>
-                        ID Folder Drive: <code>{gasApiService.extractFolderId(googleDriveFolderUrlInput) || '(Opsional: jika kosong dibuatkan otomatis)'}</code>
+                        ID Folder Drive: <code>{cloudApiService.extractFolderId(googleDriveFolderUrlInput) || '(Tempel URL Folder Drive di atas)'}</code>
                       </span>
                     </div>
                   </div>
 
-                  {/* Web App URL Google Apps Script */}
-                  <div>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'block', marginBottom: '6px' }}>
-                      URL Web App Google Apps Script (Deploy as Web App)
-                    </label>
-                    <input
-                      type="url"
-                      placeholder="https://script.google.com/macros/s/AKfycb.../exec"
-                      value={gasUrlInput}
-                      onChange={(e) => setGasUrlInput(e.target.value)}
-                      style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
-                    />
-                  </div>
-
-                  {/* Struktur Folder Bertingkat Visualizer */}
-                  <div style={{ backgroundColor: '#FFFFFF', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: '#0F172A', fontWeight: 800, fontSize: '0.88rem' }}>
-                      <FolderTree size={18} color="#059669" />
-                      <span>Struktur Folder Foto Otomatis di Google Drive:</span>
+                  {/* Vercel Serverless Information Alert */}
+                  <div style={{ backgroundColor: '#ECFDF5', border: '1.5px solid #A7F3D0', padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                    <Cloud size={24} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <h4 style={{ margin: '0 0 4px', fontSize: '0.9rem', fontWeight: 800, color: '#065F46' }}>
+                        ✅ Backend Vercel Serverless Aktif (100% Bebas Apps Script)
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: '#047857', lineHeight: 1.5 }}>
+                        Integrasi Google Cloud sekarang di-handle langsung secara otomatis oleh backend Vercel API (<code>/api/sync</code>). Anda tidak perlu lagi memasang atau mengedit <code>Code.gs</code> di Apps Script.
+                      </p>
                     </div>
-                    <div style={{
-                      backgroundColor: '#0F172A',
-                      color: '#38BDF8',
-                      fontFamily: 'Consolas, monospace',
-                      fontSize: '0.8rem',
-                      padding: '12px 16px',
-                      borderRadius: '8px',
-                      lineHeight: 1.6
-                    }}>
-                      📁 [Folder Utama Google Drive]<br/>
-                      &nbsp;&nbsp;└── 📁 2026 (Tahun)<br/>
-                      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📁 09-September (Bulan)<br/>
-                      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📁 2026-09-06 (Tanggal)<br/>
-                      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── 📁 Absen Masuk &nbsp;→ [NamaPegawai_Timestamp.jpg]<br/>
-                      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📁 Absen Pulang → [NamaPegawai_Timestamp.jpg]
-                    </div>
-                    <p style={{ margin: '8px 0 0', fontSize: '0.76rem', color: '#64748B' }}>
-                      * Backend Google Apps Script akan secara otomatis membuat dan menyusun folder tanggal serta kategori absen jika belum ada.
-                    </p>
                   </div>
 
                   {/* Action Buttons */}
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '6px' }}>
                     <button
                       type="button"
-                      onClick={async () => {
+                      onClick={() => {
                         const newSettings = {
                           ...settings,
                           storageProvider: 'GOOGLE',
                           googleSpreadsheetUrl: googleSpreadsheetUrlInput.trim(),
-                          googleDriveFolderUrl: googleDriveFolderUrlInput.trim(),
-                          gasWebhookUrl: gasUrlInput.trim()
+                          googleDriveFolderUrl: googleDriveFolderUrlInput.trim()
                         };
                         updateSettings(newSettings);
-                        showSuccess('Konfigurasi Google Cloud Storage berhasil disimpan!');
-                        
-                        // Auto-provision spreadsheet tabs & sync
-                        if (gasUrlInput.trim()) {
-                          gasApiService.testConnection(
-                            gasUrlInput.trim(),
-                            googleSpreadsheetUrlInput.trim(),
-                            googleDriveFolderUrlInput.trim()
-                          ).then(() => {
-                            if (refreshUsersFromCloud) refreshUsersFromCloud();
-                            if (refreshAttendanceFromCloud) refreshAttendanceFromCloud();
-                          }).catch(() => {});
-                        }
+                        showSuccess('Konfigurasi Google Cloud Storage via Vercel Backend berhasil disimpan!');
+                        if (refreshUsersFromCloud) refreshUsersFromCloud();
+                        if (refreshAttendanceFromCloud) refreshAttendanceFromCloud();
                       }}
                       style={{
                         backgroundColor: '#059669',
@@ -1949,26 +1908,21 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (!gasUrlInput.trim()) {
-                          showWarning('Harap isi URL Web App Google Apps Script terlebih dahulu.');
-                          return;
-                        }
-                        setTestingGas(true);
+                        setTestingGoogleCloud(true);
                         try {
-                          const res = await gasApiService.testConnection(
-                            gasUrlInput.trim(),
+                          const res = await cloudApiService.testGoogleIntegration(
                             googleSpreadsheetUrlInput.trim(),
                             googleDriveFolderUrlInput.trim()
                           );
                           if (res.success) {
-                            showSuccess(res.message, 'KONEKSI GOOGLE BERHASIL');
+                            showSuccess(res.message, 'KONEKSI GOOGLE CLOUD BERHASIL');
                           } else {
-                            showError(res.message, 'KONEKSI GOOGLE GAGAL');
+                            showError(res.message, 'KONEKSI GOOGLE CLOUD GAGAL');
                           }
                         } catch (err) {
                           showError(`Koneksi gagal: ${err.message}`, 'KONEKSI GAGAL');
                         } finally {
-                          setTestingGas(false);
+                          setTestingGoogleCloud(false);
                         }
                       }}
                       style={{
@@ -1982,34 +1936,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                         cursor: 'pointer'
                       }}
                     >
-                      {testingGas ? 'Menguji...' : '🧪 Uji Koneksi Google Apps Script'}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const codeGsText = `// Salin kode dari file backend-gas/Code.gs ke Google Apps Script Editor`;
-                        navigator.clipboard.writeText(codeGsText);
-                        setCopiedGasCode(true);
-                        showSuccess('Panduan & file Code.gs tersedia pada folder backend-gas/Code.gs di proyek Anda.', 'KODE TERSEDIA');
-                        setTimeout(() => setCopiedGasCode(false), 2000);
-                      }}
-                      style={{
-                        backgroundColor: '#FFFFFF',
-                        color: '#334155',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '8px',
-                        padding: '11px 16px',
-                        fontWeight: 700,
-                        fontSize: '0.86rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <Copy size={15} />
-                      <span>{copiedGasCode ? 'Tersalin!' : 'Lihat Kode backend-gas/Code.gs'}</span>
+                      {testingGoogleCloud ? 'Menguji...' : '🧪 Uji Koneksi Google Cloud Storage'}
                     </button>
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { storageService } from '../services/storage';
-import { gasApiService } from '../services/gasApi';
+import { cloudApiService } from '../services/cloudApi';
 
 const AuthContext = createContext();
 
@@ -11,38 +11,39 @@ export function AuthProvider({ children }) {
 
   const refreshUsersFromCloud = useCallback(async () => {
     const settings = storageService.getSettings();
-    if (!settings?.gasWebhookUrl) return;
-
-    try {
-      const cloudData = await gasApiService.fetchAllData(settings.gasWebhookUrl, settings.googleSpreadsheetUrl);
-      if (cloudData && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
-        const localUsers = storageService.getUsers();
-        // Merge cloud users with local users (preserve any local passwords if missing)
-        const mergedMap = new Map();
-        localUsers.forEach(u => mergedMap.set(u.id, u));
-        cloudData.users.forEach(cu => {
-          const existing = mergedMap.get(cu.id);
-          mergedMap.set(cu.id, {
-            ...cu,
-            password: cu.password || existing?.password || '12345678'
+    
+    // Mode 1: Cloud Google via Vercel Backend
+    if (settings?.storageProvider === 'GOOGLE' && settings?.googleSpreadsheetUrl) {
+      try {
+        const cloudData = await cloudApiService.fetchAllData(settings.googleSpreadsheetUrl);
+        if (cloudData && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
+          const localUsers = storageService.getUsers();
+          const mergedMap = new Map();
+          localUsers.forEach(u => mergedMap.set(u.id, u));
+          cloudData.users.forEach(cu => {
+            const existing = mergedMap.get(cu.id);
+            mergedMap.set(cu.id, {
+              ...cu,
+              password: cu.password || existing?.password || '12345678'
+            });
           });
-        });
 
-        const mergedUsers = Array.from(mergedMap.values());
-        storageService.saveUsers(mergedUsers);
-        setUsers(mergedUsers);
+          const mergedUsers = Array.from(mergedMap.values());
+          storageService.saveUsers(mergedUsers);
+          setUsers(mergedUsers);
 
-        const currentSession = storageService.getSession();
-        if (currentSession) {
-          const updatedSession = mergedUsers.find(u => u.id === currentSession.id);
-          if (updatedSession) {
-            setCurrentUser(updatedSession);
-            storageService.saveSession(updatedSession);
+          const currentSession = storageService.getSession();
+          if (currentSession) {
+            const updatedSession = mergedUsers.find(u => u.id === currentSession.id);
+            if (updatedSession) {
+              setCurrentUser(updatedSession);
+              storageService.saveSession(updatedSession);
+            }
           }
         }
+      } catch (err) {
+        console.warn('Gagal sinkronisasi data user dari Cloud Backend:', err);
       }
-    } catch (err) {
-      console.warn('Gagal sinkronisasi data user dari Google Sheets:', err);
     }
   }, []);
 
@@ -57,7 +58,6 @@ export function AuthProvider({ children }) {
       storageService.saveSession(syncedUser);
     }
 
-    // Background sync from cloud if configured
     refreshUsersFromCloud();
     setLoading(false);
   }, [refreshUsersFromCloud]);
@@ -128,10 +128,10 @@ export function AuthProvider({ children }) {
     const updatedUsers = [...allUsers, saved];
     setUsers(updatedUsers);
 
-    // Sync directly to Google Spreadsheet
+    // Sync directly to Cloud Vercel Backend
     const settings = storageService.getSettings();
-    if (settings?.gasWebhookUrl) {
-      gasApiService.syncUser(settings.gasWebhookUrl, saved, settings.googleSpreadsheetUrl);
+    if (settings?.storageProvider === 'GOOGLE' || settings?.googleSpreadsheetUrl) {
+      cloudApiService.syncUser(saved, settings.googleSpreadsheetUrl);
     }
 
     return { success: true, user: saved };
@@ -153,10 +153,10 @@ export function AuthProvider({ children }) {
         storageService.saveSession(updatedUser);
       }
 
-      // Sync updated admin/pegawai to Google Spreadsheet
+      // Sync updated admin/pegawai to Cloud Backend
       const settings = storageService.getSettings();
-      if (settings?.gasWebhookUrl) {
-        gasApiService.syncUser(settings.gasWebhookUrl, updatedUser, settings.googleSpreadsheetUrl);
+      if (settings?.storageProvider === 'GOOGLE' || settings?.googleSpreadsheetUrl) {
+        cloudApiService.syncUser(updatedUser, settings.googleSpreadsheetUrl);
       }
 
       return { success: true, user: updatedUser };

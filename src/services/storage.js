@@ -24,17 +24,16 @@ export const INITIAL_USERS = [
 // Clean Attendance: Completely Empty []
 export const INITIAL_ATTENDANCE = [];
 
-// Settings with Dual Storage Configuration (Google Drive/Sheets vs Dedicated RustFS Server)
+// Settings with Dual Storage Configuration (Google Cloud via Vercel Serverless vs Dedicated RustFS Server)
 export const INITIAL_SETTINGS = {
-  storageProvider: 'GOOGLE', // 'GOOGLE' (Google Sheets & Drive) vs 'SERVER' (Dedicated RustFS Storage)
+  storageProvider: 'GOOGLE', // 'GOOGLE' (Google Sheets & Drive via Vercel API) vs 'SERVER' (Dedicated RustFS Storage Server)
   googleSpreadsheetUrl: '', // Link Google Spreadsheet (https://docs.google.com/spreadsheets/d/...)
   googleDriveFolderUrl: '', // Link Folder Google Drive (https://drive.google.com/drive/folders/...)
-  gasWebhookUrl: '', // URL Google Apps Script Web App (https://script.google.com/macros/s/.../exec)
   
   rustfsEndpoint: '', // URL Endpoint Server RustFS (contoh: https://rustfs.pkmcermee.my.id)
   rustfsBucket: 'bukti-presensi', // Folder / Bucket foto di RustFS
   rustfsApiKey: '', // Token API RustFS (opsional)
-  rustfsEnabled: true, // Toggle penyimpanan foto ke RustFS
+  rustfsEnabled: false, // Toggle penyimpanan foto ke RustFS
   
   enableFaceCamera: true,
   requireGps: true,

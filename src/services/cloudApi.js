@@ -232,14 +232,33 @@ export const cloudApiService = {
   },
 
   /**
-   * Me-reset database terpusat di serverless backend
+   * Me-reset database terpusat di serverless backend & spreadsheet webhook
    */
-  async resetCentralDatabase() {
+  async resetCentralDatabase(spreadsheetUrl = '', webhookUrl = '') {
+    const payload = {
+      action: 'RESET_DATABASE',
+      spreadsheetUrl,
+      spreadsheetId: this.extractSpreadsheetId(spreadsheetUrl)
+    };
+
+    if (webhookUrl) {
+      try {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {
+        console.warn('Webhook reset database:', e);
+      }
+    }
+
     try {
       const res = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'RESET_DATABASE' })
+        body: JSON.stringify(payload)
       });
       if (res.ok) return await res.json();
     } catch (err) {

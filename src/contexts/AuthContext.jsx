@@ -71,11 +71,18 @@ export function AuthProvider({ children }) {
   }, [refreshUsersFromCloud]);
 
   const resetLocalAndCloudData = async () => {
+    const settings = storageService.getSettings();
     try {
-      await cloudApiService.resetCentralDatabase();
+      // 1. Reset cloud serverless & Google Spreadsheet
+      await cloudApiService.resetCentralDatabase(settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
+      
+      // 2. Overwrite Superadmin row in Google Sheets back to default admin
+      await cloudApiService.syncUser(INITIAL_USERS[0], settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
     } catch (e) {
       console.warn('Backend reset warning:', e);
     }
+
+    // 3. Reset local storage
     const resetResult = storageService.resetAllData();
     setUsers(resetResult.users);
     setCurrentUser(null);
@@ -129,9 +136,22 @@ export function AuthProvider({ children }) {
       return { success: false, message: 'NIP / Email atau kata sandi tidak sesuai.' };
     }
 
-    setCurrentUser(found);
-    storageService.saveSession(found);
-    return { success: true, user: found };
+    // Update live last login timestamp
+    const nowIso = new Date().toISOString();
+    const userWithLogin = {
+      ...found,
+      lastLogin: nowIso
+    };
+
+    storageService.updateUser(found.id, { lastLogin: nowIso });
+    setCurrentUser(userWithLogin);
+    storageService.saveSession(userWithLogin);
+
+    // Sync updated lastLogin to Google Spreadsheet tab Superadmin or Data Pegawai
+    const settings = storageService.getSettings();
+    cloudApiService.syncUser(userWithLogin, settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
+
+    return { success: true, user: userWithLogin };
   };
 
   const register = async ({ name, email, password, nip, skpd }) => {

@@ -1829,7 +1829,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                     <div>
                       <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                         <FileSpreadsheet size={16} color="#059669" />
-                        <span>Link Google Spreadsheet (Database Rekap & Akun)</span>
+                        <span>Link Google Spreadsheet (Data Rekap & Akun)</span>
                       </label>
                       <input
                         type="url"
@@ -1860,23 +1860,18 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                         ID Folder Drive: <code>{cloudApiService.extractFolderId(googleDriveFolderUrlInput) || '(Tempel URL Folder Drive di atas)'}</code>
                       </span>
                     </div>
+                  </div>
 
-                    {/* Link Webhook Apps Script */}
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <Cloud size={16} color="#00838F" />
-                        <span>URL Webhook Google Apps Script (Jembatan Eksekusi Tulis Spreadsheet)</span>
-                      </label>
-                      <input
-                        type="url"
-                        placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
-                        value={gasWebhookUrlInput}
-                        onChange={(e) => setGasWebhookUrlInput(e.target.value)}
-                        style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
-                      />
-                      <span style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '4px', display: 'block' }}>
-                        Webhook URL Web App yang bertugas mengeksekusi tulis / reset langsung ke tab Google Spreadsheet.
-                      </span>
+                  {/* Vercel Serverless Information Alert */}
+                  <div style={{ backgroundColor: '#ECFDF5', border: '1.5px solid #A7F3D0', padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                    <Cloud size={24} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <h4 style={{ margin: '0 0 4px', fontSize: '0.9rem', fontWeight: 800, color: '#065F46' }}>
+                        ✅ Backend Vercel Serverless Aktif (100% Bebas Apps Script)
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: '#047857', lineHeight: 1.5 }}>
+                        Integrasi Google Cloud sekarang di-handle langsung secara otomatis oleh backend Vercel API (<code>/api/sync</code>). Anda tidak perlu lagi memasang atau mengedit <code>Code.gs</code> di Apps Script.
+                      </p>
                     </div>
                   </div>
 
@@ -1889,12 +1884,11 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                           ...settings,
                           storageProvider: 'GOOGLE',
                           googleSpreadsheetUrl: googleSpreadsheetUrlInput.trim(),
-                          googleDriveFolderUrl: googleDriveFolderUrlInput.trim(),
-                          gasWebhookUrl: gasWebhookUrlInput.trim()
+                          googleDriveFolderUrl: googleDriveFolderUrlInput.trim()
                         };
                         updateSettings(newSettings);
                         await cloudApiService.saveCentralSettings(newSettings);
-                        showSuccess('Konfigurasi Google Cloud Storage & Webhook berhasil disimpan ke Cloud!');
+                        showSuccess('Konfigurasi Google Cloud Storage via Vercel Backend berhasil disimpan!');
                         if (refreshUsersFromCloud) refreshUsersFromCloud();
                         if (refreshAttendanceFromCloud) refreshAttendanceFromCloud();
                       }}
@@ -1920,8 +1914,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                         try {
                           const res = await cloudApiService.testGoogleIntegration(
                             googleSpreadsheetUrlInput.trim(),
-                            googleDriveFolderUrlInput.trim(),
-                            gasWebhookUrlInput.trim()
+                            googleDriveFolderUrlInput.trim()
                           );
                           if (res.success) {
                             showSuccess(res.message, 'KONEKSI GOOGLE CLOUD BERHASIL');

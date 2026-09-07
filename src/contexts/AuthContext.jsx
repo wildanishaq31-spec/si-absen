@@ -12,39 +12,37 @@ export function AuthProvider({ children }) {
 
   const refreshUsersFromCloud = useCallback(async () => {
     const settings = storageService.getSettings();
-    
-    // Mode Cloud Google
-    if (settings?.storageProvider === 'GOOGLE' || settings?.googleSpreadsheetUrl) {
-      try {
-        const cloudData = await cloudApiService.fetchAllData(settings.googleSpreadsheetUrl, settings.gasWebhookUrl);
-        if (cloudData && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
-          const localUsers = storageService.getUsers();
-          const mergedMap = new Map();
-          localUsers.forEach(u => mergedMap.set(u.id, u));
-          cloudData.users.forEach(cu => {
-            const existing = mergedMap.get(cu.id);
-            mergedMap.set(cu.id, {
-              ...cu,
-              password: cu.password || existing?.password || '12345678'
-            });
+    try {
+      const cloudData = await cloudApiService.fetchAllData(settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
+      if (cloudData && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
+        const localUsers = storageService.getUsers();
+        const mergedMap = new Map();
+        localUsers.forEach(u => mergedMap.set(u.id || u.email, u));
+        cloudData.users.forEach(cu => {
+          const key = cu.id || cu.email;
+          const existing = mergedMap.get(key);
+          mergedMap.set(key, {
+            ...existing,
+            ...cu,
+            password: cu.password || existing?.password || '12345678'
           });
+        });
 
-          const mergedUsers = Array.from(mergedMap.values());
-          storageService.saveUsers(mergedUsers);
-          setUsers(mergedUsers);
+        const mergedUsers = Array.from(mergedMap.values());
+        storageService.saveUsers(mergedUsers);
+        setUsers(mergedUsers);
 
-          const currentSession = storageService.getSession();
-          if (currentSession) {
-            const updatedSession = mergedUsers.find(u => u.id === currentSession.id);
-            if (updatedSession) {
-              setCurrentUser(updatedSession);
-              storageService.saveSession(updatedSession);
-            }
+        const currentSession = storageService.getSession();
+        if (currentSession) {
+          const updatedSession = mergedUsers.find(u => u.id === currentSession.id || u.email === currentSession.email);
+          if (updatedSession) {
+            setCurrentUser(updatedSession);
+            storageService.saveSession(updatedSession);
           }
         }
-      } catch (err) {
-        console.warn('Gagal sinkronisasi data user dari Cloud Backend:', err);
       }
+    } catch (err) {
+      console.warn('Gagal sinkronisasi data user dari Cloud Backend:', err);
     }
   }, []);
 

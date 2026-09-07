@@ -28,7 +28,7 @@ export function RegisterPage({ onNavigateToLogin, onRegisterSuccess }) {
   const score = (hasUppercase ? 1 : 0) + (hasNumber ? 1 : 0) + (hasMinLength ? 1 : 0);
   const isPasswordValid = hasUppercase && hasNumber && hasMinLength;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -59,28 +59,33 @@ export function RegisterPage({ onNavigateToLogin, onRegisterSuccess }) {
 
     setLoading(true);
 
-    const result = register({
-      name: name.trim(),
-      email: email.trim(),
-      password,
-      nip: nip.trim(),
-      skpd: skpd.trim()
-    });
+    try {
+      const result = await register({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        nip: nip.trim(),
+        skpd: skpd.trim()
+      });
 
-    setLoading(false);
+      setLoading(false);
 
-    if (!result.success) {
-      setErrorMsg(result.message);
-    } else {
-      try {
-        confetti({
-          particleCount: 70,
-          spread: 60,
-          origin: { y: 0.6 },
-          colors: ['#00838F', '#00ACC1', '#26A69A', '#10B981']
-        });
-      } catch (err) {}
-      setRegisteredUser(result.user);
+      if (!result.success) {
+        setErrorMsg(result.message);
+      } else {
+        try {
+          confetti({
+            particleCount: 70,
+            spread: 60,
+            origin: { y: 0.6 },
+            colors: ['#00838F', '#00ACC1', '#26A69A', '#10B981']
+          });
+        } catch (err) {}
+        setRegisteredUser(result.user);
+      }
+    } catch (err) {
+      setLoading(false);
+      setErrorMsg('Terjadi kesalahan pendaftaran: ' + (err.message || 'Silakan coba lagi.'));
     }
   };
 

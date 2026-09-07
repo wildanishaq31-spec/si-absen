@@ -37,7 +37,7 @@ export function AdminEmployeeData() {
     setErrorMsg('');
   };
 
-  const handleSaveEdit = (userId) => {
+  const handleSaveEdit = async (userId) => {
     // Validate NIP doesn't belong to someone else
     const nipExists = users.some(u => u.nip === editForm.nip && u.id !== userId);
     if (nipExists) {
@@ -52,7 +52,7 @@ export function AdminEmployeeData() {
       return;
     }
 
-    updateUser(userId, editForm);
+    await updateUser(userId, editForm);
     setIsEditing(null);
     setErrorMsg('');
     showSuccess(`Data pegawai ${editForm.name} berhasil diperbarui!`);
@@ -72,7 +72,7 @@ export function AdminEmployeeData() {
     });
   };
 
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -81,7 +81,7 @@ export function AdminEmployeeData() {
       return;
     }
     
-    const result = register(createForm);
+    const result = await register(createForm);
     if (!result.success) {
       setErrorMsg(result.message);
     } else {

@@ -88,6 +88,7 @@ export function AuthProvider({ children }) {
 
     const allUsers = storageService.getUsers();
     const cleanId = (identifier || '').toLowerCase().trim();
+    const isAdminLogin = requiredRole === 'admin';
     
     // Find user by email or NIP
     const found = allUsers.find(
@@ -95,20 +96,37 @@ export function AuthProvider({ children }) {
     );
 
     if (!found) {
+      if (isAdminLogin) {
+        return { 
+          success: false, 
+          message: 'Akun Administrator tidak ditemukan. Jika baru saja mereset data, silakan gunakan email bawaan: admin@siabsen.go.id (kata sandi: admin).' 
+        };
+      }
       return { 
         success: false, 
         message: 'Akun pegawai tidak ditemukan dalam database. Silakan daftar akun baru terlebih dahulu.' 
       };
     }
 
+    if (requiredRole && found.role !== requiredRole) {
+      return { 
+        success: false, 
+        message: isAdminLogin 
+          ? 'Akun ini bukan bertipe Administrator.' 
+          : 'Akun ini bukan bertipe Pegawai.' 
+      };
+    }
+
     // Verify cryptographic SHA-256 hash (or plaintext fallback)
     const isValidPassword = await verifyPassword(password, found.password);
     if (!isValidPassword) {
-      return { success: false, message: 'Email / NIP atau kata sandi tidak sesuai.' };
-    }
-
-    if (requiredRole && found.role !== requiredRole) {
-      return { success: false, message: `Akun ini bukan bertipe ${requiredRole}.` };
+      if (isAdminLogin) {
+        return { 
+          success: false, 
+          message: 'Kata sandi Administrator salah. Jika baru mereset data, kata sandi bawaannya adalah "admin".' 
+        };
+      }
+      return { success: false, message: 'NIP / Email atau kata sandi tidak sesuai.' };
     }
 
     setCurrentUser(found);

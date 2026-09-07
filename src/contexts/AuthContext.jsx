@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { storageService } from '../services/storage';
 import { cloudApiService } from '../services/cloudApi';
+import { hashPassword, verifyPassword } from '../utils/crypto';
 
 const AuthContext = createContext();
 
@@ -12,10 +13,10 @@ export function AuthProvider({ children }) {
   const refreshUsersFromCloud = useCallback(async () => {
     const settings = storageService.getSettings();
     
-    // Mode 1: Cloud Google via Vercel Backend
-    if (settings?.storageProvider === 'GOOGLE' && settings?.googleSpreadsheetUrl) {
+    // Mode Cloud Google
+    if (settings?.storageProvider === 'GOOGLE' || settings?.googleSpreadsheetUrl) {
       try {
-        const cloudData = await cloudApiService.fetchAllData(settings.googleSpreadsheetUrl);
+        const cloudData = await cloudApiService.fetchAllData(settings.googleSpreadsheetUrl, settings.gasWebhookUrl);
         if (cloudData && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
           const localUsers = storageService.getUsers();
           const mergedMap = new Map();
@@ -62,14 +63,22 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, [refreshUsersFromCloud]);
 
-  const login = (identifier, password, requiredRole = null) => {
+  const login = async (identifier, password, requiredRole = null) => {
     const allUsers = storageService.getUsers();
     const cleanId = (identifier || '').toLowerCase().trim();
+    
+    // Find user by email or NIP
     const found = allUsers.find(
-      u => (u.email?.toLowerCase().trim() === cleanId || u.nip?.toLowerCase().trim() === cleanId) && u.password === password
+      u => (u.email?.toLowerCase().trim() === cleanId || u.nip?.toLowerCase().trim() === cleanId)
     );
 
     if (!found) {
+      return { success: false, message: 'Email / NIP atau kata sandi tidak sesuai.' };
+    }
+
+    // Verify cryptographic SHA-256 hash (or plaintext fallback)
+    const isValidPassword = await verifyPassword(password, found.password);
+    if (!isValidPassword) {
       return { success: false, message: 'Email / NIP atau kata sandi tidak sesuai.' };
     }
 
@@ -113,11 +122,14 @@ export function AuthProvider({ children }) {
       return { success: false, message: 'SKPD / Unit Kerja wajib diisi.' };
     }
 
+    // Hash password with SHA-256
+    const hashedPassword = await hashPassword(password);
+
     const newUser = {
       id: `U-${Date.now()}`,
       name: name.trim(),
       email: emailClean,
-      password,
+      password: hashedPassword,
       role: 'pegawai',
       nip: nipClean,
       skpd: skpd.trim(),
@@ -128,11 +140,9 @@ export function AuthProvider({ children }) {
     const updatedUsers = [...allUsers, saved];
     setUsers(updatedUsers);
 
-    // Sync directly to Cloud Vercel Backend
+    // Sync directly to Google Spreadsheet & Cloud Backend
     const settings = storageService.getSettings();
-    if (settings?.storageProvider === 'GOOGLE' || settings?.googleSpreadsheetUrl) {
-      cloudApiService.syncUser(saved, settings.googleSpreadsheetUrl);
-    }
+    cloudApiService.syncUser(saved, settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
 
     return { success: true, user: saved };
   };
@@ -142,8 +152,15 @@ export function AuthProvider({ children }) {
     setCurrentUser(null);
   };
 
-  const updateUser = (userId, updatedData) => {
-    const updatedUser = storageService.updateUser(userId, updatedData);
+  const updateUser = async (userId, updatedData) => {
+    const payloadToSave = { ...updatedData };
+    
+    // Hash password if updating password
+    if (payloadToSave.password) {
+      payloadToSave.password = await hashPassword(payloadToSave.password);
+    }
+
+    const updatedUser = storageService.updateUser(userId, payloadToSave);
     if (updatedUser) {
       const allUsers = storageService.getUsers();
       setUsers(allUsers);
@@ -153,11 +170,9 @@ export function AuthProvider({ children }) {
         storageService.saveSession(updatedUser);
       }
 
-      // Sync updated admin/pegawai to Cloud Backend
+      // Sync updated admin/pegawai to Google Spreadsheet (tab Superadmin or Data Pegawai)
       const settings = storageService.getSettings();
-      if (settings?.storageProvider === 'GOOGLE' || settings?.googleSpreadsheetUrl) {
-        cloudApiService.syncUser(updatedUser, settings.googleSpreadsheetUrl);
-      }
+      cloudApiService.syncUser(updatedUser, settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
 
       return { success: true, user: updatedUser };
     }

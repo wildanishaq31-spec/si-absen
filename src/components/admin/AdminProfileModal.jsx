@@ -39,7 +39,7 @@ export function AdminProfileModal({ isOpen, onClose }) {
   const hasMinLength = newPassword.length >= 8;
   const isNewPasswordValid = !newPassword || (hasUppercase && hasNumber && hasMinLength);
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
@@ -71,21 +71,26 @@ export function AdminProfileModal({ isOpen, onClose }) {
       updateData.password = newPassword;
     }
 
-    const res = updateUser(currentUser.id, updateData);
-    setIsSubmitting(false);
+    try {
+      const res = await updateUser(currentUser.id, updateData);
+      setIsSubmitting(false);
 
-    if (res.success) {
-      setSuccessMsg('Profil Administrator berhasil disimpan!');
-      if (showSuccess) {
-        showSuccess('Profil Administrator berhasil diperbarui!');
+      if (res.success) {
+        setSuccessMsg('Profil Administrator berhasil disimpan & disinkronkan ke Google Spreadsheet!');
+        if (showSuccess) {
+          showSuccess('Profil Administrator berhasil diperbarui!');
+        }
+        setNewPassword('');
+        setConfirmPassword('');
+        setTimeout(() => {
+          onClose();
+        }, 1200);
+      } else {
+        setErrorMsg(res.message || 'Gagal memperbarui profil.');
       }
-      setNewPassword('');
-      setConfirmPassword('');
-      setTimeout(() => {
-        onClose();
-      }, 1200);
-    } else {
-      setErrorMsg(res.message || 'Gagal memperbarui profil.');
+    } catch (err) {
+      setIsSubmitting(false);
+      setErrorMsg('Gagal memperbarui profil: ' + err.message);
     }
   };
 
@@ -96,8 +101,8 @@ export function AdminProfileModal({ isOpen, onClose }) {
       message: 'Apakah Anda yakin ingin mengatur ulang kata sandi admin ke default ("admin")?',
       confirmText: 'YA, RESET',
       cancelText: 'BATAL',
-      onConfirm: () => {
-        const res = updateUser(currentUser.id, { password: 'admin' });
+      onConfirm: async () => {
+        const res = await updateUser(currentUser.id, { password: 'admin' });
         if (res.success) {
           setNewPassword('');
           setConfirmPassword('');

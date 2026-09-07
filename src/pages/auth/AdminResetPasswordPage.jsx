@@ -153,7 +153,7 @@ export function AdminResetPasswordPage({ onNavigateToLogin }) {
   };
 
   // STEP 3: Update Password
-  const handleUpdatePassword = (e) => {
+  const handleUpdatePassword = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -169,8 +169,8 @@ export function AdminResetPasswordPage({ onNavigateToLogin }) {
 
     setLoading(true);
 
-    setTimeout(() => {
-      const res = updateUser(targetUser.id, { password: newPassword });
+    try {
+      const res = await updateUser(targetUser.id, { password: newPassword });
       setLoading(false);
 
       if (res.success) {
@@ -178,7 +178,10 @@ export function AdminResetPasswordPage({ onNavigateToLogin }) {
       } else {
         setErrorMsg(res.message || 'Gagal memperbarui kata sandi.');
       }
-    }, 600);
+    } catch (err) {
+      setLoading(false);
+      setErrorMsg('Gagal memperbarui kata sandi: ' + err.message);
+    }
   };
 
   const handleCopyDemoOtp = () => {

@@ -16,12 +16,12 @@ export function LoginPage({ initialRole = 'pegawai', onNavigateToRegister, onNav
     setPassword('');
   }, [initialRole]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     setLoading(true);
 
-    const result = login(email, password, role);
+    const result = await login(email, password, role);
     if (!result.success) {
       setErrorMsg(result.message);
       setLoading(false);

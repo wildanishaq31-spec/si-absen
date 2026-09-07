@@ -27,7 +27,7 @@ export function AdminForceSetupModal({ isOpen }) {
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -69,19 +69,22 @@ export function AdminForceSetupModal({ isOpen }) {
       password: newPassword
     };
 
-    setTimeout(() => {
-      const res = updateUser(currentUser.id, updatePayload);
+    try {
+      const res = await updateUser(currentUser.id, updatePayload);
       setLoading(false);
 
       if (res.success) {
         if (triggerSuccessAnimation) triggerSuccessAnimation();
         if (showToast) {
-          showToast('🎉 Akun Administrator berhasil diamankan! Kredensial default telah diganti.', 'success');
+          showToast('🎉 Akun Administrator berhasil diamankan & dienkripsi! Kredensial telah disinkronkan ke Google Spreadsheet.', 'success');
         }
       } else {
         setErrorMsg(res.message || 'Gagal memperbarui data akun.');
       }
-    }, 500);
+    } catch (err) {
+      setLoading(false);
+      setErrorMsg('Gagal memperbarui akun: ' + err.message);
+    }
   };
 
   return (

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, Check, AlertTriangle, ShieldCheck, Camera, Image, User, CreditCard, Sparkles } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Check, AlertTriangle, Camera, Image, User, CreditCard } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useCamera } from '../../hooks/useCamera';
 import { useFaceMesh } from '../../hooks/useFaceMesh';
@@ -26,34 +26,27 @@ export function FaceCameraModal({
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const [previewImage, setPreviewImage] = useState(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [successAnimation, setSuccessAnimation] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const capturedSnapRef = useRef(null);
 
   const handleLivenessSuccess = useCallback(() => {
-    // Automatically capture image on liveness verification!
+    // Automatically capture image on instant blink verification
     const snap = captureSnapshot();
     if (snap) {
+      capturedSnapRef.current = snap;
       setPreviewImage(snap);
-      setSuccessAnimation(true);
+      setShowSuccessDialog(true);
       
       // Trigger celebratory confetti
       try {
         confetti({
-          particleCount: 50,
-          spread: 60,
-          origin: { y: 0.6 }
+          particleCount: 60,
+          spread: 70,
+          origin: { y: 0.5 }
         });
-      } catch (e) {
-        // Confetti optional
-      }
-
-      // Auto submit after brief visual confirmation
-      setTimeout(() => {
-        onCaptureComplete(snap);
-        onClose();
-      }, 1000);
+      } catch (e) {}
     }
-  }, [captureSnapshot, onCaptureComplete, onClose]);
+  }, [captureSnapshot]);
 
   const {
     isModelLoading,
@@ -75,8 +68,8 @@ export function FaceCameraModal({
   useEffect(() => {
     if (isOpen) {
       setPreviewImage(null);
-      setSuccessAnimation(false);
-      setIsVerifying(false);
+      setShowSuccessDialog(false);
+      capturedSnapRef.current = null;
       startCamera('user');
     } else {
       stopCamera();
@@ -99,16 +92,25 @@ export function FaceCameraModal({
 
   if (!isOpen) return null;
 
+  const handleConfirmSuccess = () => {
+    const finalSnap = capturedSnapRef.current || previewImage;
+    if (finalSnap) {
+      onCaptureComplete(finalSnap);
+    }
+    setShowSuccessDialog(false);
+    onClose();
+  };
+
   // Manual snapshot fallback
   const handleManualSnap = () => {
     const snap = captureSnapshot();
     if (snap) {
+      capturedSnapRef.current = snap;
       setPreviewImage(snap);
-      setSuccessAnimation(true);
-      setTimeout(() => {
-        onCaptureComplete(snap);
-        onClose();
-      }, 700);
+      setShowSuccessDialog(true);
+      try {
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.5 } });
+      } catch (e) {}
     }
   };
 
@@ -126,12 +128,9 @@ export function FaceCameraModal({
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, 640, 640);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        capturedSnapRef.current = dataUrl;
         setPreviewImage(dataUrl);
-        setSuccessAnimation(true);
-        setTimeout(() => {
-          onCaptureComplete(dataUrl);
-          onClose();
-        }, 800);
+        setShowSuccessDialog(true);
       };
       img.src = event.target.result;
     };
@@ -140,6 +139,13 @@ export function FaceCameraModal({
 
   const employeeName = currentUser?.name || 'AGUNG SISWOYO';
   const employeeNip = currentUser?.nip || '199407312025211093';
+
+  // Subtitle for success modal
+  const successSubtitle = title.toLowerCase().includes('pulang')
+    ? 'Berhasil Presensi Pulang'
+    : title.toLowerCase().includes('test')
+      ? 'Berhasil Presensi Mode Test'
+      : 'Berhasil Presensi Masuk';
 
   return (
     <div 
@@ -186,7 +192,7 @@ export function FaceCameraModal({
         <h2 
           style={{
             margin: 0,
-            fontSize: '1.05rem',
+            fontSize: '1.1rem',
             fontWeight: 800,
             letterSpacing: '1px',
             textTransform: 'uppercase',
@@ -230,47 +236,6 @@ export function FaceCameraModal({
               alt="Verifikasi Wajah Berhasil"
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
-            <div 
-              style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundColor: 'rgba(16, 185, 129, 0.25)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px'
-              }}
-            >
-              <div 
-                style={{
-                  width: '70px',
-                  height: '70px',
-                  borderRadius: '50%',
-                  backgroundColor: '#10B981',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#FFF',
-                  boxShadow: '0 0 25px #10B981'
-                }}
-              >
-                <Check size={40} strokeWidth={3} />
-              </div>
-              <div 
-                style={{
-                  backgroundColor: 'rgba(15, 23, 42, 0.85)',
-                  backdropFilter: 'blur(8px)',
-                  padding: '8px 18px',
-                  borderRadius: '20px',
-                  color: '#FFF',
-                  fontWeight: 800,
-                  fontSize: '0.95rem'
-                }}
-              >
-                Wajah Berhasil Diverifikasi!
-              </div>
-            </div>
           </div>
         ) : (
           /* Live Stream & FaceMesh Canvas */
@@ -291,7 +256,7 @@ export function FaceCameraModal({
               }}
             />
 
-            {/* MediaPipe Green Face Mesh Canvas Overlay */}
+            {/* MediaPipe Green Face Mesh Canvas Overlay (Precise Contours) */}
             <canvas 
               ref={canvasRef}
               style={{
@@ -314,14 +279,14 @@ export function FaceCameraModal({
                 top: '20px',
                 left: '20px',
                 right: '20px',
-                backgroundColor: 'rgba(24, 24, 27, 0.80)',
-                backdropFilter: 'blur(10px)',
+                backgroundColor: 'rgba(28, 28, 30, 0.85)',
+                backdropFilter: 'blur(12px)',
                 borderRadius: '24px',
                 padding: '14px 20px',
                 textAlign: 'center',
                 color: '#FFFFFF',
                 boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
                 zIndex: 20
               }}
             >
@@ -459,76 +424,76 @@ export function FaceCameraModal({
         style={{ display: 'none' }} 
       />
 
-      {/* Bottom Section: Employee Identity Card (Exactly as in SIPP Screenshot) */}
+      {/* Bottom Section: Employee Identity Card (Exact SIPP Screenshot Match) */}
       <div 
         style={{
-          backgroundColor: '#0B1528',
+          backgroundColor: '#0A1325',
           borderTopLeftRadius: '28px',
           borderTopRightRadius: '28px',
-          padding: '18px 20px 24px 20px',
+          padding: '16px 20px 24px 20px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '14px',
-          boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.5)',
+          gap: '12px',
+          boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.6)',
           zIndex: 30
         }}
       >
         {/* Top Handle Indicator */}
         <div style={{ width: '40px', height: '4px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px' }} />
 
-        {/* Circular Avatar with Red Badge Border */}
+        {/* Circular Avatar with Blue & Red Circle Frame matching SIPP */}
         <div 
           style={{
-            width: '82px',
-            height: '82px',
+            width: '84px',
+            height: '84px',
             borderRadius: '50%',
-            backgroundColor: '#0C203E',
+            backgroundColor: '#0F213E',
             border: '3px solid #1E3A8A',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
-            overflow: 'hidden',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
             position: 'relative'
           }}
         >
-          {/* Red inner circle badge */}
+          {/* Red circular badge background */}
           <div 
             style={{
-              width: '68px',
-              height: '68px',
+              width: '72px',
+              height: '72px',
               borderRadius: '50%',
-              backgroundColor: '#DC2626',
+              backgroundColor: '#DE3636',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden'
             }}
           >
-            {currentUser?.photo ? (
-              <img 
-                src={currentUser.photo} 
-                alt={employeeName} 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-              />
-            ) : (
-              <div 
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: '#B91C1C',
-                  color: '#FFFFFF',
-                  fontSize: '1.6rem',
-                  fontWeight: 800
-                }}
-              >
-                {employeeName.charAt(0)}
-              </div>
-            )}
+            {/* ASN Illustration Cartoon Avatar */}
+            <svg viewBox="0 0 100 100" width="100%" height="100%">
+              {/* Head / Face */}
+              <circle cx="50" cy="42" r="22" fill="#FCD34D" />
+              {/* Hair */}
+              <path d="M28,38 C28,24 40,16 52,16 C66,16 74,24 74,38 C70,30 60,26 48,26 C36,26 30,32 28,38 Z" fill="#3E2723" />
+              {/* Winking Left Eye */}
+              <path d="M38,42 Q43,36 48,42" stroke="#1F2937" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+              {/* Right Open Eye */}
+              <circle cx="58" cy="41" r="3" fill="#1F2937" />
+              <circle cx="59" cy="40" r="1" fill="#FFFFFF" />
+              {/* Nose */}
+              <path d="M50,44 L48,48 L52,48" stroke="#D97706" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+              {/* Confident Smile */}
+              <path d="M44,52 Q50,57 56,52" stroke="#B45309" strokeWidth="2" fill="none" strokeLinecap="round" />
+              {/* PNS / ASN Uniform (Khaki Tan Brown) */}
+              <path d="M22,95 L22,78 C22,68 34,64 50,64 C66,64 78,68 78,78 L78,95 Z" fill="#A87948" />
+              {/* Uniform Collar */}
+              <path d="M42,64 L50,76 L58,64" fill="#FFFFFF" />
+              <path d="M36,64 L50,78 L64,64" fill="#8C6239" />
+              {/* Badge pin / Buttons */}
+              <circle cx="50" cy="84" r="2" fill="#FBBF24" />
+              <rect x="30" y="74" width="8" height="4" rx="1" fill="#FBBF24" />
+            </svg>
           </div>
         </div>
 
@@ -537,8 +502,8 @@ export function FaceCameraModal({
           style={{
             width: '100%',
             maxWidth: '380px',
-            backgroundColor: '#0F213E',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            backgroundColor: '#0D1B33',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
             borderRadius: '16px',
             padding: '14px 16px',
             display: 'flex',
@@ -553,7 +518,7 @@ export function FaceCameraModal({
                 width: '36px',
                 height: '36px',
                 borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -563,7 +528,7 @@ export function FaceCameraModal({
               <User size={18} />
             </div>
             <div>
-              <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600 }}>Nama</div>
+              <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>Nama</div>
               <div style={{ fontSize: '0.95rem', color: '#FFFFFF', fontWeight: 800, letterSpacing: '0.3px' }}>
                 {employeeName}
               </div>
@@ -577,7 +542,7 @@ export function FaceCameraModal({
                 width: '36px',
                 height: '36px',
                 borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -587,7 +552,7 @@ export function FaceCameraModal({
               <CreditCard size={18} />
             </div>
             <div>
-              <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600 }}>NIP</div>
+              <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>NIP</div>
               <div style={{ fontSize: '0.92rem', color: '#FFFFFF', fontWeight: 700, letterSpacing: '0.5px' }}>
                 {employeeNip}
               </div>
@@ -604,7 +569,7 @@ export function FaceCameraModal({
               justifyContent: 'space-between',
               width: '100%',
               maxWidth: '320px',
-              paddingTop: '6px'
+              paddingTop: '4px'
             }}
           >
             {/* Flip camera */}
@@ -627,7 +592,7 @@ export function FaceCameraModal({
               <RefreshCw size={20} />
             </button>
 
-            {/* Manual Shutter Button (Takes instant photo if needed) */}
+            {/* Manual Shutter Button */}
             <button 
               onClick={handleManualSnap}
               style={{
@@ -670,6 +635,106 @@ export function FaceCameraModal({
           </div>
         )}
       </div>
+
+      {/* Pop-up Dialog Sukses (Exact Match with Gambar 3 Screenshot) */}
+      {showSuccessDialog && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            zIndex: 99999,
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+        >
+          <div 
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '24px',
+              padding: '28px 24px',
+              width: '100%',
+              maxWidth: '320px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.35)',
+              animation: 'scaleUp 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+            }}
+          >
+            {/* Big Green Circle Icon with White Checkmark */}
+            <div 
+              style={{
+                width: '84px',
+                height: '84px',
+                borderRadius: '50%',
+                backgroundColor: '#00C853',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF',
+                boxShadow: '0 8px 24px rgba(0, 200, 83, 0.4)',
+                marginBottom: '16px'
+              }}
+            >
+              <Check size={48} strokeWidth={3.5} />
+            </div>
+
+            {/* Title */}
+            <h3 
+              style={{
+                margin: '0 0 6px 0',
+                fontSize: '1.25rem',
+                fontWeight: 800,
+                color: '#1E293B'
+              }}
+            >
+              Sukses Absensi
+            </h3>
+
+            {/* Subtitle */}
+            <p 
+              style={{
+                margin: '0 0 24px 0',
+                fontSize: '0.88rem',
+                color: '#64748B',
+                fontWeight: 500
+              }}
+            >
+              {successSubtitle}
+            </p>
+
+            {/* Full Width Green Button "✓ Ok" */}
+            <button 
+              onClick={handleConfirmSuccess}
+              style={{
+                width: '100%',
+                padding: '14px',
+                backgroundColor: '#00C853',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '16px',
+                fontSize: '1rem',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 6px 18px rgba(0, 200, 83, 0.35)',
+                transition: 'transform 0.1s'
+              }}
+            >
+              <Check size={20} strokeWidth={3} /> Ok
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

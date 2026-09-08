@@ -60,11 +60,11 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
   const faceMeshRef = useRef(null);
   const animationFrameRef = useRef(null);
   const blinkTrackerRef = useRef({
-    baselineEAR: 0.28,
-    hasBeenOpen: false,
+    calibratedFrames: 0,
+    openBaselineEAR: 0.28,
+    isEyesOpen: false,
     hasClosed: false,
-    closedTimestamp: null,
-    consecutiveClosedFrames: 0
+    closedTimestamp: null
   });
   const verifiedRef = useRef(false);
 
@@ -75,11 +75,11 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     setIsVerified(false);
     setProgress(0);
     blinkTrackerRef.current = {
-      baselineEAR: 0.28,
-      hasBeenOpen: false,
+      calibratedFrames: 0,
+      openBaselineEAR: 0.28,
+      isEyesOpen: false,
       hasClosed: false,
-      closedTimestamp: null,
-      consecutiveClosedFrames: 0
+      closedTimestamp: null
     };
 
     if (!isActive) {
@@ -195,7 +195,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     };
   }, [isModelLoading, isActive, runDetection]);
 
-  // Process Landmarks, Enforce Frontal Head Pose, and Detect Instant 1x Blink
+  // Process Landmarks, Enforce Frontal Head Pose, and Require Genuine 1x Blink
   const processFaceResults = (results) => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
@@ -213,7 +213,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       setPromptText('Posisikan Wajah');
       setPromptSubtitle('Arahkan wajah ke dalam lingkaran');
       blinkTrackerRef.current.hasClosed = false;
-      blinkTrackerRef.current.consecutiveClosedFrames = 0;
+      blinkTrackerRef.current.calibratedFrames = 0;
       return;
     }
 
@@ -270,6 +270,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       setPromptSubtitle('Jangan menghadap ke samping');
       setProgress(0);
       blinkTrackerRef.current.hasClosed = false;
+      blinkTrackerRef.current.calibratedFrames = 0;
       return;
     }
 
@@ -278,6 +279,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       setPromptSubtitle('Jangan memiringkan kepala');
       setProgress(0);
       blinkTrackerRef.current.hasClosed = false;
+      blinkTrackerRef.current.calibratedFrames = 0;
       return;
     }
 
@@ -286,33 +288,42 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       setPromptSubtitle('Arahkan wajah ke dalam lingkaran panduan');
       setProgress(15);
       blinkTrackerRef.current.hasClosed = false;
+      blinkTrackerRef.current.calibratedFrames = 0;
       return;
     }
 
-    // 2. High Precision Dynamic 1x Blink Detection
+    // 2. High Precision Genuine 1x Blink Detection Engine
     const leftEAR = calculateEAR(landmarks, LEFT_EYE);
     const rightEAR = calculateEAR(landmarks, RIGHT_EYE);
     const currentEAR = (leftEAR + rightEAR) / 2.0;
 
     const tracker = blinkTrackerRef.current;
 
-    // Dynamically update baseline open eye EAR
-    if (currentEAR > 0.24) {
-      tracker.baselineEAR = tracker.baselineEAR * 0.9 + currentEAR * 0.1;
-      tracker.hasBeenOpen = true;
-    }
-
-    // Adaptive closed eye threshold based on personal baseline
-    const closeThreshold = Math.min(0.22, Math.max(0.16, tracker.baselineEAR * 0.72));
-    const openThreshold = closeThreshold + 0.03;
+    // Thresholds: Eyes Closed vs Eyes Open
+    const closeThreshold = Math.min(0.185, Math.max(0.14, tracker.openBaselineEAR * 0.65));
+    const openThreshold = Math.max(0.22, tracker.openBaselineEAR * 0.82);
 
     setPromptText('Kedipkan Mata');
     setPromptSubtitle('(Tahan 1 Detik)');
 
-    if (currentEAR <= closeThreshold) {
-      // Eyes are closed
+    // Phase 1: Open Eye Calibration (User must be looking at camera with open eyes first)
+    if (currentEAR >= openThreshold) {
+      if (tracker.calibratedFrames < 6) {
+        tracker.calibratedFrames += 1;
+        tracker.openBaselineEAR = (tracker.openBaselineEAR * tracker.calibratedFrames + currentEAR) / (tracker.calibratedFrames + 1);
+      }
+      tracker.isEyesOpen = true;
+
+      // If user previously closed eyes and now opened them -> 1X COMPLETE BLINK!
+      if (tracker.hasClosed && !verifiedRef.current) {
+        setProgress(100);
+        handleVerificationSuccess();
+        return;
+      }
+    } 
+    // Phase 2: Eyes Closed (Only valid AFTER eyes were verified open)
+    else if (currentEAR <= closeThreshold && tracker.isEyesOpen && tracker.calibratedFrames >= 4) {
       tracker.hasClosed = true;
-      tracker.consecutiveClosedFrames += 1;
       if (!tracker.closedTimestamp) {
         tracker.closedTimestamp = Date.now();
       }
@@ -321,24 +332,11 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       const pct = Math.min(100, Math.round((closedDuration / 200) * 100));
       setProgress(pct);
 
-      // If closed for 150ms+ (deliberate single blink hold), verify instantly!
-      if ((closedDuration >= 150 || tracker.consecutiveClosedFrames >= 3) && !verifiedRef.current) {
+      // If held closed for >= 200ms, also trigger verification
+      if (closedDuration >= 200 && !verifiedRef.current) {
         setProgress(100);
         handleVerificationSuccess();
       }
-    } else if (currentEAR >= openThreshold) {
-      // Eyes are currently open
-      if (tracker.hasBeenOpen && tracker.hasClosed && !verifiedRef.current) {
-        // Natural 1x quick blink completed! (Open -> Closed -> Reopened)
-        setProgress(100);
-        handleVerificationSuccess();
-        return;
-      }
-      
-      // Reset closed tracking if eyes remain open without verification
-      tracker.hasClosed = false;
-      tracker.closedTimestamp = null;
-      tracker.consecutiveClosedFrames = 0;
     }
   };
 
@@ -347,7 +345,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     verifiedRef.current = true;
     setIsVerified(true);
     setProgress(100);
-    setPromptText('Verifikasi Berhasil');
+    setPromptText('✓ Verifikasi Berhasil');
     setPromptSubtitle('Memproses presensi...');
 
     // Haptic vibration feedback on mobile
@@ -360,7 +358,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     if (onLivenessSuccess) {
       setTimeout(() => {
         onLivenessSuccess();
-      }, 200);
+      }, 150);
     }
   };
 

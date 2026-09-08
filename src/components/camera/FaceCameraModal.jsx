@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, Check, AlertTriangle, Camera, Image, User, CreditCard } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertTriangle, Camera, Image, User, CreditCard } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useCamera } from '../../hooks/useCamera';
 import { useFaceMesh } from '../../hooks/useFaceMesh';
@@ -26,27 +26,29 @@ export function FaceCameraModal({
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const [previewImage, setPreviewImage] = useState(null);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const capturedSnapRef = useRef(null);
 
   const handleLivenessSuccess = useCallback(() => {
-    // Automatically capture image on instant blink verification
+    // Automatically capture image on verified blink
     const snap = captureSnapshot();
     if (snap) {
-      capturedSnapRef.current = snap;
       setPreviewImage(snap);
-      setShowSuccessDialog(true);
       
       // Trigger celebratory confetti
       try {
         confetti({
-          particleCount: 60,
-          spread: 70,
+          particleCount: 50,
+          spread: 60,
           origin: { y: 0.5 }
         });
       } catch (e) {}
+
+      // Immediately pass captured image to dashboard to show standard SI-ABSEN success modal
+      setTimeout(() => {
+        onCaptureComplete(snap);
+        onClose();
+      }, 350);
     }
-  }, [captureSnapshot]);
+  }, [captureSnapshot, onCaptureComplete, onClose]);
 
   const {
     isModelLoading,
@@ -68,8 +70,6 @@ export function FaceCameraModal({
   useEffect(() => {
     if (isOpen) {
       setPreviewImage(null);
-      setShowSuccessDialog(false);
-      capturedSnapRef.current = null;
       startCamera('user');
     } else {
       stopCamera();
@@ -92,25 +92,13 @@ export function FaceCameraModal({
 
   if (!isOpen) return null;
 
-  const handleConfirmSuccess = () => {
-    const finalSnap = capturedSnapRef.current || previewImage;
-    if (finalSnap) {
-      onCaptureComplete(finalSnap);
-    }
-    setShowSuccessDialog(false);
-    onClose();
-  };
-
   // Manual snapshot fallback
   const handleManualSnap = () => {
     const snap = captureSnapshot();
     if (snap) {
-      capturedSnapRef.current = snap;
       setPreviewImage(snap);
-      setShowSuccessDialog(true);
-      try {
-        confetti({ particleCount: 50, spread: 60, origin: { y: 0.5 } });
-      } catch (e) {}
+      onCaptureComplete(snap);
+      onClose();
     }
   };
 
@@ -128,9 +116,9 @@ export function FaceCameraModal({
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, 640, 640);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        capturedSnapRef.current = dataUrl;
         setPreviewImage(dataUrl);
-        setShowSuccessDialog(true);
+        onCaptureComplete(dataUrl);
+        onClose();
       };
       img.src = event.target.result;
     };
@@ -139,13 +127,6 @@ export function FaceCameraModal({
 
   const employeeName = currentUser?.name || 'AGUNG SISWOYO';
   const employeeNip = currentUser?.nip || '199407312025211093';
-
-  // Subtitle for success modal
-  const successSubtitle = title.toLowerCase().includes('pulang')
-    ? 'Berhasil Presensi Pulang'
-    : title.toLowerCase().includes('test')
-      ? 'Berhasil Presensi Mode Test'
-      : 'Berhasil Presensi Masuk';
 
   return (
     <div 
@@ -635,106 +616,6 @@ export function FaceCameraModal({
           </div>
         )}
       </div>
-
-      {/* Pop-up Dialog Sukses (Exact Match with Gambar 3 Screenshot) */}
-      {showSuccessDialog && (
-        <div 
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-            zIndex: 99999,
-            animation: 'fadeIn 0.2s ease-out'
-          }}
-        >
-          <div 
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '24px',
-              padding: '28px 24px',
-              width: '100%',
-              maxWidth: '320px',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.35)',
-              animation: 'scaleUp 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-            }}
-          >
-            {/* Big Green Circle Icon with White Checkmark */}
-            <div 
-              style={{
-                width: '84px',
-                height: '84px',
-                borderRadius: '50%',
-                backgroundColor: '#00C853',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF',
-                boxShadow: '0 8px 24px rgba(0, 200, 83, 0.4)',
-                marginBottom: '16px'
-              }}
-            >
-              <Check size={48} strokeWidth={3.5} />
-            </div>
-
-            {/* Title */}
-            <h3 
-              style={{
-                margin: '0 0 6px 0',
-                fontSize: '1.25rem',
-                fontWeight: 800,
-                color: '#1E293B'
-              }}
-            >
-              Sukses Absensi
-            </h3>
-
-            {/* Subtitle */}
-            <p 
-              style={{
-                margin: '0 0 24px 0',
-                fontSize: '0.88rem',
-                color: '#64748B',
-                fontWeight: 500
-              }}
-            >
-              {successSubtitle}
-            </p>
-
-            {/* Full Width Green Button "✓ Ok" */}
-            <button 
-              onClick={handleConfirmSuccess}
-              style={{
-                width: '100%',
-                padding: '14px',
-                backgroundColor: '#00C853',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '16px',
-                fontSize: '1rem',
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                boxShadow: '0 6px 18px rgba(0, 200, 83, 0.35)',
-                transition: 'transform 0.1s'
-              }}
-            >
-              <Check size={20} strokeWidth={3} /> Ok
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

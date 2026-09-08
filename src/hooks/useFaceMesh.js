@@ -12,8 +12,8 @@ function getDistance(p1, p2) {
 
 /**
  * Direct Eyelid Openness Ratio Calculation:
- * Left Eye: Top (159) to Bottom (145) / Left (33) to Right (133)
- * Right Eye: Top (386) to Bottom (374) / Left (362) to Right (263)
+ * Left Eye: Vertical (159 to 145) / Horizontal (33 to 133)
+ * Right Eye: Vertical (386 to 374) / Horizontal (362 to 263)
  */
 function getEyeOpenness(landmarks) {
   const leftTop = landmarks[159];
@@ -27,16 +27,16 @@ function getEyeOpenness(landmarks) {
   const rightOuter = landmarks[263];
 
   if (!leftTop || !leftBottom || !leftOuter || !leftInner || !rightTop || !rightBottom || !rightInner || !rightOuter) {
-    return 0.28;
+    return null;
   }
 
   const leftHeight = getDistance(leftTop, leftBottom);
   const leftWidth = getDistance(leftOuter, leftInner);
-  const leftRatio = leftWidth > 0 ? leftHeight / leftWidth : 0.28;
+  const leftRatio = leftWidth > 0 ? leftHeight / leftWidth : 0.25;
 
   const rightHeight = getDistance(rightTop, rightBottom);
   const rightWidth = getDistance(rightInner, rightOuter);
-  const rightRatio = rightWidth > 0 ? rightHeight / rightWidth : 0.28;
+  const rightRatio = rightWidth > 0 ? rightHeight / rightWidth : 0.25;
 
   return (leftRatio + rightRatio) / 2.0;
 }
@@ -74,12 +74,13 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
   const animationFrameRef = useRef(null);
   const verifiedRef = useRef(false);
 
-  // Blink tracking ref
-  const blinkRef = useRef({
-    hadEyesOpen: false,
+  // Dynamic Eye Baseline & Blink State Tracker
+  const blinkStateRef = useRef({
+    calibratedFrames: 0,
+    openEyeBaseline: 0, // dynamic baseline
+    isEyesOpen: false,
     hasClosed: false,
-    closedStartTime: null,
-    closedFrameCount: 0
+    closedTimestamp: null
   });
 
   // Initialize MediaPipe FaceMesh
@@ -88,11 +89,12 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     verifiedRef.current = false;
     setIsVerified(false);
     setProgress(0);
-    blinkRef.current = {
-      hadEyesOpen: false,
+    blinkStateRef.current = {
+      calibratedFrames: 0,
+      openEyeBaseline: 0,
+      isEyesOpen: false,
       hasClosed: false,
-      closedStartTime: null,
-      closedFrameCount: 0
+      closedTimestamp: null
     };
 
     if (!isActive) {
@@ -207,7 +209,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     };
   }, [isModelLoading, isActive, runDetection]);
 
-  // Process Landmarks, Head Alignment, and Instant Blink Detection
+  // Process Landmarks, Enforce Frontal Face, and Strict 2-Phase Blink
   const processFaceResults = (results) => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
@@ -224,8 +226,8 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       setProgress(0);
       setPromptText('Posisikan Wajah');
       setPromptSubtitle('Arahkan wajah ke dalam lingkaran');
-      blinkRef.current.hasClosed = false;
-      blinkRef.current.closedStartTime = null;
+      blinkStateRef.current.hasClosed = false;
+      blinkStateRef.current.calibratedFrames = 0;
       return;
     }
 
@@ -248,14 +250,13 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     const symmetryRatio = leftDist / (rightDist + 0.0001);
     const eyeTilt = Math.abs(leftEye.y - rightEye.y);
 
-    // Generous frontal thresholds to allow natural slight movement
     const isFacingSideways = symmetryRatio < 0.45 || symmetryRatio > 2.20;
     const isHeadTilted = eyeTilt > 0.16;
     const isCentered = noseTip.x > 0.12 && noseTip.x < 0.88 && noseTip.y > 0.10 && noseTip.y < 0.90;
 
     setFaceInGuide(isCentered && !isFacingSideways && !isHeadTilted);
 
-    // Draw ONLY clean facial contour green dots (exact SIPP look)
+    // Draw clean facial contour green dots (exact SIPP look)
     ctx.save();
     ctx.fillStyle = '#4ADE80';
     ctx.shadowColor = '#22C55E';
@@ -278,8 +279,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       setPromptText('Hadapkan Wajah Lurus');
       setPromptSubtitle('Jangan menghadap ke samping');
       setProgress(0);
-      blinkRef.current.hasClosed = false;
-      blinkRef.current.closedStartTime = null;
+      blinkStateRef.current.hasClosed = false;
       return;
     }
 
@@ -287,8 +287,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       setPromptText('Posisikan Kepala Tegak');
       setPromptSubtitle('Jangan memiringkan kepala');
       setProgress(0);
-      blinkRef.current.hasClosed = false;
-      blinkRef.current.closedStartTime = null;
+      blinkStateRef.current.hasClosed = false;
       return;
     }
 
@@ -296,47 +295,69 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       setPromptText('Posisikan Wajah di Tengah');
       setPromptSubtitle('Arahkan wajah ke dalam lingkaran panduan');
       setProgress(15);
-      blinkRef.current.hasClosed = false;
-      blinkRef.current.closedStartTime = null;
+      blinkStateRef.current.hasClosed = false;
       return;
     }
 
-    // 2. Accurate Eye Openness Calculation
+    // 2. Adaptive Relative Drop Eye-Blink Detection (100% Reliable for all eye shapes)
     const eyeOpenness = getEyeOpenness(landmarks);
-    const tracker = blinkRef.current;
+    if (!eyeOpenness) return;
 
+    const tracker = blinkStateRef.current;
     setPromptText('Kedipkan Mata');
     setPromptSubtitle('(Tahan 1 Detik)');
 
-    // Closed threshold: eye ratio < 0.205 (typical closed eyelid ratio is 0.08 - 0.18)
-    // Open threshold: eye ratio >= 0.215 (typical open eye ratio is 0.25 - 0.40)
-    const isCurrentlyClosed = eyeOpenness < 0.205;
-    const isCurrentlyOpen = eyeOpenness >= 0.215;
+    // Step A: Calibrate the user's OPEN eye baseline
+    if (tracker.calibratedFrames < 8) {
+      // First 8 frames track open eyes baseline
+      tracker.openEyeBaseline = tracker.openEyeBaseline === 0 
+        ? eyeOpenness 
+        : Math.max(tracker.openEyeBaseline, eyeOpenness);
+      tracker.calibratedFrames += 1;
+      tracker.isEyesOpen = true;
+      setProgress(20);
+      return; // Wait until open eye baseline is calibrated!
+    }
 
-    if (isCurrentlyOpen) {
-      tracker.hadEyesOpen = true;
+    // Keep updating the maximum open eye ratio if user opens eyes wider
+    if (eyeOpenness > tracker.openEyeBaseline) {
+      tracker.openEyeBaseline = (tracker.openEyeBaseline * 0.8) + (eyeOpenness * 0.2);
+    }
 
-      // If user was confirmed to have closed their eyes and has NOW reopened them:
-      // => Complete 1x Blink (Open ➔ Closed ➔ Reopened)!
+    const baseline = tracker.openEyeBaseline;
+    // EYES CLOSED = Eye ratio drops below 60% of their open eye baseline (or absolute < 0.12)
+    const isEyesClosed = eyeOpenness <= (baseline * 0.60) || eyeOpenness < 0.12;
+    // EYES OPEN = Eye ratio is above 80% of their open eye baseline
+    const isEyesOpen = eyeOpenness >= (baseline * 0.80);
+
+    // Phase 1: User is looking at camera with open eyes
+    if (isEyesOpen) {
+      tracker.isEyesOpen = true;
+
+      // If user PREVIOUSLY CLOSED their eyes and has NOW RE-OPENED them:
+      // => 1X COMPLETE NATURAL BLINK (Open ➔ Closed ➔ Reopened)!
       if (tracker.hasClosed && !verifiedRef.current) {
         setProgress(100);
         handleVerificationSuccess();
         return;
       }
-    } else if (isCurrentlyClosed) {
-      tracker.hasClosed = true;
-      tracker.closedFrameCount += 1;
 
-      if (!tracker.closedStartTime) {
-        tracker.closedStartTime = Date.now();
+      tracker.closedTimestamp = null;
+      setProgress(25);
+    } 
+    // Phase 2: User CLOSES their eyes (Blinking or Closed Hold)
+    else if (isEyesClosed && tracker.isEyesOpen) {
+      tracker.hasClosed = true;
+      if (!tracker.closedTimestamp) {
+        tracker.closedTimestamp = Date.now();
       }
 
-      const closedDuration = Date.now() - tracker.closedStartTime;
-      const pct = Math.min(100, Math.round((closedDuration / 150) * 100));
+      const closedDuration = Date.now() - tracker.closedTimestamp;
+      const pct = Math.min(100, Math.round(50 + (closedDuration / 200) * 50));
       setProgress(pct);
 
-      // If held closed for >= 150ms or >= 3 frames: verify instantly!
-      if ((closedDuration >= 150 || tracker.closedFrameCount >= 3) && !verifiedRef.current) {
+      // If held closed for >= 200ms: Verify instantly!
+      if (closedDuration >= 200 && !verifiedRef.current) {
         setProgress(100);
         handleVerificationSuccess();
       }

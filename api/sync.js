@@ -297,6 +297,35 @@ export default async function handler(req, res) {
       });
     }
 
+    // 4b. ACTION: Delete Attendance (Single or Bulk)
+    if (action === 'DELETE_ATTENDANCE' || action === 'DELETE_ATTENDANCE_BULK') {
+      const ids = body.recordIds || (body.recordId ? [body.recordId] : []) || [];
+      const idList = Array.isArray(ids) ? ids : [ids];
+
+      if (idList.length > 0) {
+        const idSet = new Set(idList);
+        memoryAttendance = memoryAttendance.filter(a => !idSet.has(a.id));
+
+        if (sql) {
+          try {
+            await sql`
+              DELETE FROM attendance 
+              WHERE id = ANY(${idList})
+            `;
+          } catch (err) {
+            console.warn('Postgres delete attendance error:', err);
+          }
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `${idList.length} data presensi berhasil dihapus dari database.`,
+        deletedIds: idList,
+        timestamp: new Date().toISOString()
+      });
+    }
+
     // 5. ACTION: Register & Sync User (Pegawai & Admin)
     if (action === 'REGISTER_USER' || action === 'SYNC_USER' || action === 'UPDATE_USER' || action === 'UPDATE_ADMIN' || action === 'REGISTER_PEGAWAI') {
       const user = body.data || body.user || body;

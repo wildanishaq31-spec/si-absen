@@ -105,6 +105,18 @@ export const storageService = {
     return record;
   },
 
+  deleteAttendanceRecords(recordIds = []) {
+    let records = this.getAttendance();
+    const idSet = new Set(recordIds);
+    records = records.filter(r => !idSet.has(r.id));
+    this.saveAttendance(records);
+    return records;
+  },
+
+  deleteAttendance(recordId) {
+    return this.deleteAttendanceRecords([recordId]);
+  },
+
   getSettings() {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (!raw) {

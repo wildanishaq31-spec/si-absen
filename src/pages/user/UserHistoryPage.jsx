@@ -12,8 +12,8 @@ export function UserHistoryPage({ onNavigateBack }) {
   const { currentUser } = useAuth();
   const { records } = useAttendance();
 
-  // Selected date filter (default: today 03-09-2026 / current date)
-  const [selectedDate, setSelectedDate] = useState('2026-09-03');
+  // Selected date filter (default: current date)
+  const [selectedDate, setSelectedDate] = useState(() => formatDateYMD(new Date()));
 
   // Format YYYY-MM-DD to DD/MM/YYYY
   const parts = selectedDate.split('-');
@@ -28,9 +28,61 @@ export function UserHistoryPage({ onNavigateBack }) {
     return r.date === formattedFilterDate;
   });
 
+  // Helper function to resolve distinct styling and tags for different attendance types
+  const getLogCardInfo = (item) => {
+    const rawType = (item.type || '').trim();
+    const typeUpper = rawType.toUpperCase();
+    const isShift = item.category === 'SHIFT' || typeUpper.includes('SHIFT');
+    
+    const isPulang = typeUpper.includes('PULANG') || typeUpper === 'OUT';
+    const isMasuk = typeUpper.includes('MASUK') || typeUpper === 'IN';
+    const isLeave = ['IZIN', 'SAKIT', 'CUTI', 'DINAS LUAR'].includes(typeUpper);
+
+    if (isShift && isPulang) {
+      return {
+        cardClass: 'card-shift-pulang',
+        tagText: 'SHIFT PULANG',
+        isEnter: false
+      };
+    }
+    if (isShift && isMasuk) {
+      return {
+        cardClass: 'card-shift-masuk',
+        tagText: 'SHIFT MASUK',
+        isEnter: true
+      };
+    }
+    if (isPulang) {
+      return {
+        cardClass: 'card-harian-pulang',
+        tagText: 'HARIAN_PULANG',
+        isEnter: false
+      };
+    }
+    if (isMasuk) {
+      return {
+        cardClass: 'card-harian-masuk',
+        tagText: 'HARIAN_MASUK',
+        isEnter: true
+      };
+    }
+    if (isLeave) {
+      return {
+        cardClass: 'card-izin',
+        tagText: rawType.toUpperCase(),
+        isEnter: true
+      };
+    }
+    return {
+      cardClass: 'card-harian-masuk',
+      tagText: rawType.toUpperCase(),
+      isEnter: true
+    };
+  };
+
   return (
     <div className="history-page-container">
-      {/* Header Riwayat Presensi Matching Screenshot 2 */}
+      {/* Header Riwayat Presensi */}
       <header className="history-screen-header">
         <div className="history-header-left" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {onNavigateBack && (
@@ -89,7 +141,7 @@ export function UserHistoryPage({ onNavigateBack }) {
           </div>
         </div>
 
-        {/* Attendance Log Cards List Matching Screenshot 2 */}
+        {/* Attendance Log Cards List with Dynamic Colors */}
         <div className="attendance-cards-list">
           {filteredRecords.length === 0 ? (
             <div className="empty-history-card">
@@ -97,57 +149,60 @@ export function UserHistoryPage({ onNavigateBack }) {
               <p>Tidak ada data presensi pada tanggal {formattedFilterDate || selectedDate}.</p>
             </div>
           ) : (
-            filteredRecords.map((item) => (
-              <div key={item.id} className="sipp-log-card">
-                {/* Selfie / Evidence Thumbnail */}
-                <div className="log-card-photo-box">
-                  <img 
-                    src={item.evidenceSnapshot || item.evidenceUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'} 
-                    alt="Foto Verifikasi Wajah" 
-                    className="log-photo-img"
-                  />
-                </div>
+            filteredRecords.map((item) => {
+              const info = getLogCardInfo(item);
+              return (
+                <div key={item.id} className={`sipp-log-card ${info.cardClass}`}>
+                  {/* Selfie / Evidence Thumbnail */}
+                  <div className="log-card-photo-box">
+                    <img 
+                      src={item.evidenceSnapshot || item.evidenceUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'} 
+                      alt="Foto Verifikasi Wajah" 
+                      className="log-photo-img"
+                    />
+                  </div>
 
-                {/* Card Content Details */}
-                <div className="log-card-details">
-                  {/* Top Row: Type Tag & Direction Arrow */}
-                  <div className="log-card-top-row">
-                    <span className="log-type-tag">
-                      {item.type === 'Masuk' ? 'HARIAN_MASUK' : item.type === 'Pulang' ? 'HARIAN_PULANG' : item.type.toUpperCase()}
-                    </span>
-                    <div className="log-arrow-icon">
-                      {item.type === 'Masuk' ? <LogIn size={20} /> : <LogOut size={20} />}
+                  {/* Card Content Details */}
+                  <div className="log-card-details">
+                    {/* Top Row: Type Tag & Direction Arrow */}
+                    <div className="log-card-top-row">
+                      <span className="log-type-tag">
+                        {info.tagText}
+                      </span>
+                      <div className="log-arrow-icon" title={info.isEnter ? 'Presensi Masuk' : 'Presensi Pulang'}>
+                        {info.isEnter ? <LogIn size={20} /> : <LogOut size={20} />}
+                      </div>
+                    </div>
+
+                    {/* ID / NIP */}
+                    <div className="log-detail-row">
+                      <User size={15} />
+                      <span>{currentUser?.nip?.substring(0, 5) || '24845'}</span>
+                    </div>
+
+                    {/* Time */}
+                    <div className="log-detail-row">
+                      <Clock size={15} />
+                      <span style={{ fontWeight: 800 }}>{item.time}</span>
+                    </div>
+
+                    {/* Office / SKPD Location */}
+                    <div className="log-detail-row">
+                      <MapPin size={15} />
+                      <span style={{ textTransform: 'uppercase' }}>
+                        {currentUser?.skpd || 'UPTD PUSKESMAS CERMEE'}
+                      </span>
+                    </div>
+
+                    {/* Status Terkirim Pill */}
+                    <div className="log-terkirim-pill">
+                      <Smartphone size={14} />
+                      <span>TERKIRIM</span>
                     </div>
                   </div>
-
-                  {/* ID / NIP */}
-                  <div className="log-detail-row">
-                    <User size={15} />
-                    <span>{currentUser?.nip?.substring(0, 5) || '24845'}</span>
-                  </div>
-
-                  {/* Time */}
-                  <div className="log-detail-row">
-                    <Clock size={15} />
-                    <span style={{ fontWeight: 800 }}>{item.time}</span>
-                  </div>
-
-                  {/* Office / SKPD Location */}
-                  <div className="log-detail-row">
-                    <MapPin size={15} />
-                    <span style={{ textTransform: 'uppercase' }}>
-                      {currentUser?.skpd || 'PUSKESMAS CERMEE'}
-                    </span>
-                  </div>
-
-                  {/* Status Terkirim Pill */}
-                  <div className="log-terkirim-pill">
-                    <Smartphone size={14} />
-                    <span>TERKIRIM</span>
-                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

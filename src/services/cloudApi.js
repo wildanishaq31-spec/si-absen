@@ -78,6 +78,33 @@ export const cloudApiService = {
   },
 
   /**
+   * Menghapus riwayat presensi dari Database Vercel Postgres
+   */
+  async deleteAttendance(recordIds = []) {
+    const list = Array.isArray(recordIds) ? recordIds : [recordIds];
+    if (list.length === 0) return { success: true };
+
+    const payload = {
+      action: 'DELETE_ATTENDANCE_BULK',
+      recordIds: list
+    };
+
+    try {
+      const res = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.warn('Vercel serverless delete attendance error:', err);
+    }
+    return { success: true };
+  },
+
+  /**
    * Mendaftarkan atau memperbarui data Admin / Pegawai ke Database Vercel Postgres
    */
   async syncUser(user) {

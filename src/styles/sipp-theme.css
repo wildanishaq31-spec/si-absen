@@ -1078,6 +1078,33 @@
   gap: 14px;
   box-shadow: 0 8px 24px rgba(0, 131, 143, 0.25);
   position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Modifier Warna Khusus Tiap Jenis Presensi */
+.sipp-log-card.card-harian-masuk {
+  background: linear-gradient(135deg, #00ACC1 0%, #00838F 100%);
+  box-shadow: 0 8px 24px rgba(0, 131, 143, 0.25);
+}
+
+.sipp-log-card.card-harian-pulang {
+  background: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
+  box-shadow: 0 8px 24px rgba(234, 88, 12, 0.28);
+}
+
+.sipp-log-card.card-shift-masuk {
+  background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%);
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.25);
+}
+
+.sipp-log-card.card-shift-pulang {
+  background: linear-gradient(135deg, #E11D48 0%, #9F1239 100%);
+  box-shadow: 0 8px 24px rgba(225, 29, 72, 0.28);
+}
+
+.sipp-log-card.card-izin {
+  background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
+  box-shadow: 0 8px 24px rgba(109, 40, 217, 0.25);
 }
 
 .log-card-photo-box {

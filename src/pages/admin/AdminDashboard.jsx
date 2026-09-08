@@ -4,7 +4,7 @@ import {
   Download, Search, Filter, RefreshCw, ExternalLink, 
   Settings, ShieldCheck, FileSpreadsheet, Eye, 
   Table, LayoutGrid, Check, X as CloseIcon, Layers, Sun, Moon, Sunset, LogOut, MapPin, Building2,
-  Folder, FolderTree, HardDrive, Cloud, Database, Copy
+  Folder, FolderTree, HardDrive, Cloud, Database, Copy, Trash2, CheckSquare, Square
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAttendance } from '../../contexts/AttendanceContext';
@@ -46,9 +46,25 @@ const WEEK_OPTIONS = [
 
 export function AdminDashboard({ onSwitchToUser, onLogout }) {
   const { currentUser, users, refreshUsersFromCloud, resetLocalAndCloudData } = useAuth();
-  const { records, handleExportExcel, settings, updateSettings, refreshAttendanceFromCloud, showSuccess, showError, showWarning, showConfirm, showAlert, showToast } = useAttendance();
+  const { 
+    records, 
+    handleExportExcel, 
+    settings, 
+    updateSettings, 
+    deleteAttendanceRecords,
+    refreshAttendanceFromCloud, 
+    showSuccess, 
+    showError, 
+    showWarning, 
+    showConfirm, 
+    showAlert, 
+    showToast 
+  } = useAttendance();
 
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [selectedMasukIds, setSelectedMasukIds] = useState([]);
+  const [selectedPulangIds, setSelectedPulangIds] = useState([]);
+  const [isDeletingRecords, setIsDeletingRecords] = useState(false);
 
   // Auto-sync on mount
   useEffect(() => {
@@ -146,6 +162,106 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
          r.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
          r.date?.includes(searchQuery)
   );
+
+  // --- SELECTION & DELETION HANDLERS (PRESENSI MASUK & PULANG) ---
+  const isAllMasukSelected = filteredMasuk.length > 0 && filteredMasuk.every(r => selectedMasukIds.includes(r.id));
+  const isAllPulangSelected = filteredPulang.length > 0 && filteredPulang.every(r => selectedPulangIds.includes(r.id));
+
+  const handleToggleSelectAllMasuk = () => {
+    if (isAllMasukSelected) {
+      setSelectedMasukIds([]);
+    } else {
+      setSelectedMasukIds(filteredMasuk.map(r => r.id));
+    }
+  };
+
+  const handleToggleSelectMasuk = (id) => {
+    setSelectedMasukIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleDeleteSelectedMasuk = () => {
+    if (selectedMasukIds.length === 0) return;
+    showConfirm({
+      title: 'HAPUS DATA PRESENSI MASUK',
+      message: `Apakah Anda yakin ingin menghapus ${selectedMasukIds.length} data presensi masuk terpilih? Data uji coba ini akan dibersihkan secara permanen dari database lokal & cloud.`,
+      type: 'warning',
+      confirmText: `YA, HAPUS (${selectedMasukIds.length}) DATA`,
+      cancelText: 'BATAL',
+      onConfirm: async () => {
+        setIsDeletingRecords(true);
+        try {
+          await deleteAttendanceRecords(selectedMasukIds);
+          setSelectedMasukIds([]);
+        } finally {
+          setIsDeletingRecords(false);
+        }
+      }
+    });
+  };
+
+  const handleDeleteSingleMasuk = (r) => {
+    showConfirm({
+      title: 'HAPUS PRESENSI MASUK',
+      message: `Apakah Anda yakin ingin menghapus data presensi masuk atas nama "${r.userName}" (${r.date} ${r.time})?`,
+      type: 'warning',
+      confirmText: 'YA, HAPUS',
+      cancelText: 'BATAL',
+      onConfirm: async () => {
+        await deleteAttendanceRecords([r.id]);
+        setSelectedMasukIds(prev => prev.filter(id => id !== r.id));
+      }
+    });
+  };
+
+  const handleToggleSelectAllPulang = () => {
+    if (isAllPulangSelected) {
+      setSelectedPulangIds([]);
+    } else {
+      setSelectedPulangIds(filteredPulang.map(r => r.id));
+    }
+  };
+
+  const handleToggleSelectPulang = (id) => {
+    setSelectedPulangIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleDeleteSelectedPulang = () => {
+    if (selectedPulangIds.length === 0) return;
+    showConfirm({
+      title: 'HAPUS DATA PRESENSI PULANG',
+      message: `Apakah Anda yakin ingin menghapus ${selectedPulangIds.length} data presensi pulang terpilih? Data uji coba ini akan dibersihkan secara permanen dari database lokal & cloud.`,
+      type: 'warning',
+      confirmText: `YA, HAPUS (${selectedPulangIds.length}) DATA`,
+      cancelText: 'BATAL',
+      onConfirm: async () => {
+        setIsDeletingRecords(true);
+        try {
+          await deleteAttendanceRecords(selectedPulangIds);
+          setSelectedPulangIds([]);
+        } finally {
+          setIsDeletingRecords(false);
+        }
+      }
+    });
+  };
+
+  const handleDeleteSinglePulang = (r) => {
+    showConfirm({
+      title: 'HAPUS PRESENSI PULANG',
+      message: `Apakah Anda yakin ingin menghapus data presensi pulang atas nama "${r.userName}" (${r.date} ${r.time})?`,
+      type: 'warning',
+      confirmText: 'YA, HAPUS',
+      cancelText: 'BATAL',
+      onConfirm: async () => {
+        await deleteAttendanceRecords([r.id]);
+        setSelectedPulangIds(prev => prev.filter(id => id !== r.id));
+      }
+    });
+  };
 
   const handleSaveSettings = (e) => {
     e.preventDefault();
@@ -1048,10 +1164,47 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
         {/* TAB 1: ABSEN MASUK */}
         {activeTab === 'MASUK' && (
           <div className="table-card">
+            {/* Bulk Selection Bar */}
+            {selectedMasukIds.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991B1B', fontWeight: 700, fontSize: '0.85rem' }}>
+                  <CheckSquare size={18} color="#DC2626" />
+                  <span>{selectedMasukIds.length} data presensi masuk dipilih</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMasukIds([])}
+                    style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#475569', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Batal Pilih
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelectedMasuk}
+                    disabled={isDeletingRecords}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#DC2626', color: '#FFFFFF', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)' }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Hapus {selectedMasukIds.length} Data Terpilih</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="table-responsive">
               <table className="admin-data-table">
                 <thead>
                   <tr>
+                    <th style={{ width: '40px', textAlign: 'center' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isAllMasukSelected} 
+                        onChange={handleToggleSelectAllMasuk}
+                        title="Pilih Semua Data"
+                        style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#00838F' }}
+                      />
+                    </th>
                     <th>Timestamp</th>
                     <th>Email Address</th>
                     <th>Nama</th>
@@ -1062,54 +1215,89 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                     <th>Tanggal</th>
                     <th>Jam</th>
                     <th>Status</th>
+                    <th style={{ textAlign: 'center', width: '80px' }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredMasuk.length === 0 ? (
-                    <tr><td colSpan={attendanceCategory === 'SHIFT' ? 10 : 9} style={{ textAlign: 'center', padding: '24px', color: '#94A3B8' }}>Tidak ada data absen masuk {attendanceCategory === 'SHIFT' ? 'shift' : 'harian'}.</td></tr>
+                    <tr><td colSpan={attendanceCategory === 'SHIFT' ? 12 : 11} style={{ textAlign: 'center', padding: '24px', color: '#94A3B8' }}>Tidak ada data absen masuk {attendanceCategory === 'SHIFT' ? 'shift' : 'harian'}.</td></tr>
                   ) : (
-                    filteredMasuk.map((r) => (
-                      <tr key={r.id}>
-                        <td>{r.timestamp}</td>
-                        <td>{r.email}</td>
-                        <td style={{ fontWeight: 700 }}>{r.userName}</td>
-                        {attendanceCategory === 'SHIFT' && (
+                    filteredMasuk.map((r) => {
+                      const isSelected = selectedMasukIds.includes(r.id);
+                      return (
+                        <tr key={r.id} style={{ backgroundColor: isSelected ? '#F0FDFA' : undefined }}>
+                          <td style={{ textAlign: 'center' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isSelected} 
+                              onChange={() => handleToggleSelectMasuk(r.id)}
+                              style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#00838F' }}
+                            />
+                          </td>
+                          <td>{r.timestamp}</td>
+                          <td>{r.email}</td>
+                          <td style={{ fontWeight: 700 }}>{r.userName}</td>
+                          {attendanceCategory === 'SHIFT' && (
+                            <td>
+                              <span style={{ 
+                                padding: '2px 8px', 
+                                borderRadius: '6px', 
+                                fontSize: '0.75rem', 
+                                fontWeight: 700, 
+                                backgroundColor: r.shiftType === 'MALAM' ? '#1E1B4B' : r.shiftType === 'SORE' ? '#FEF3C7' : '#E0F7FA',
+                                color: r.shiftType === 'MALAM' ? '#C7D2FE' : r.shiftType === 'SORE' ? '#B45309' : '#00838F'
+                              }}>
+                                {r.shiftName || r.shiftType || 'Shift'}
+                              </span>
+                            </td>
+                          )}
                           <td>
-                            <span style={{ 
-                              padding: '2px 8px', 
-                              borderRadius: '6px', 
-                              fontSize: '0.75rem', 
-                              fontWeight: 700, 
-                              backgroundColor: r.shiftType === 'MALAM' ? '#1E1B4B' : r.shiftType === 'SORE' ? '#FEF3C7' : '#E0F7FA',
-                              color: r.shiftType === 'MALAM' ? '#C7D2FE' : r.shiftType === 'SORE' ? '#B45309' : '#00838F'
-                            }}>
-                              {r.shiftName || r.shiftType || 'Shift'}
+                            <span className={`badge-status ${r.isLate ? 'late' : 'ontime'}`}>
+                              {r.type}
                             </span>
                           </td>
-                        )}
-                        <td>
-                          <span className={`badge-status ${r.isLate ? 'late' : 'ontime'}`}>
-                            {r.type}
-                          </span>
-                        </td>
-                        <td>
-                          {r.evidenceUrl ? (
-                            <a href={r.evidenceUrl} target="_blank" rel="noreferrer" className="drive-link-btn">
-                              <span>Drive Link</span>
-                              <ExternalLink size={12} />
-                            </a>
-                          ) : '-'}
-                        </td>
-                        <td style={{ color: '#64748B', fontSize: '0.78rem' }}>{r.compositeKey}</td>
-                        <td>{r.date}</td>
-                        <td style={{ fontWeight: 700, color: '#00838F' }}>{r.time}</td>
-                        <td>
-                          <span className={`badge-status ${r.isLate ? 'late' : 'ontime'}`}>
-                            {r.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                          <td>
+                            {r.evidenceUrl ? (
+                              <a href={r.evidenceUrl} target="_blank" rel="noreferrer" className="drive-link-btn">
+                                <span>Drive Link</span>
+                                <ExternalLink size={12} />
+                              </a>
+                            ) : '-'}
+                          </td>
+                          <td style={{ color: '#64748B', fontSize: '0.78rem' }}>{r.compositeKey}</td>
+                          <td>{r.date}</td>
+                          <td style={{ fontWeight: 700, color: '#00838F' }}>{r.time}</td>
+                          <td>
+                            <span className={`badge-status ${r.isLate ? 'late' : 'ontime'}`}>
+                              {r.status}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSingleMasuk(r)}
+                              title="Hapus data presensi ini"
+                              style={{
+                                background: '#FEE2E2',
+                                border: '1px solid #FECACA',
+                                borderRadius: '6px',
+                                color: '#DC2626',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700
+                              }}
+                            >
+                              <Trash2 size={13} />
+                              <span>Hapus</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1120,10 +1308,47 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
         {/* TAB 2: ABSEN PULANG */}
         {activeTab === 'PULANG' && (
           <div className="table-card">
+            {/* Bulk Selection Bar */}
+            {selectedPulangIds.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991B1B', fontWeight: 700, fontSize: '0.85rem' }}>
+                  <CheckSquare size={18} color="#DC2626" />
+                  <span>{selectedPulangIds.length} data presensi pulang dipilih</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPulangIds([])}
+                    style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#475569', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Batal Pilih
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelectedPulang}
+                    disabled={isDeletingRecords}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#DC2626', color: '#FFFFFF', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)' }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Hapus {selectedPulangIds.length} Data Terpilih</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="table-responsive">
               <table className="admin-data-table">
                 <thead>
                   <tr>
+                    <th style={{ width: '40px', textAlign: 'center' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isAllPulangSelected} 
+                        onChange={handleToggleSelectAllPulang}
+                        title="Pilih Semua Data"
+                        style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#00838F' }}
+                      />
+                    </th>
                     <th>Timestamp</th>
                     <th>Email Address</th>
                     <th>Nama</th>
@@ -1134,52 +1359,87 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
                     <th>Jam</th>
                     <th>Status</th>
                     <th>Jumlah Jam Kerja</th>
+                    <th style={{ textAlign: 'center', width: '80px' }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredPulang.length === 0 ? (
-                    <tr><td colSpan={attendanceCategory === 'SHIFT' ? 10 : 9} style={{ textAlign: 'center', padding: '24px', color: '#94A3B8' }}>Tidak ada data absen pulang {attendanceCategory === 'SHIFT' ? 'shift' : 'harian'}.</td></tr>
+                    <tr><td colSpan={attendanceCategory === 'SHIFT' ? 12 : 11} style={{ textAlign: 'center', padding: '24px', color: '#94A3B8' }}>Tidak ada data absen pulang {attendanceCategory === 'SHIFT' ? 'shift' : 'harian'}.</td></tr>
                   ) : (
-                    filteredPulang.map((r) => (
-                      <tr key={r.id}>
-                        <td>{r.timestamp}</td>
-                        <td>{r.email}</td>
-                        <td style={{ fontWeight: 700 }}>{r.userName}</td>
-                        {attendanceCategory === 'SHIFT' && (
+                    filteredPulang.map((r) => {
+                      const isSelected = selectedPulangIds.includes(r.id);
+                      return (
+                        <tr key={r.id} style={{ backgroundColor: isSelected ? '#F0FDFA' : undefined }}>
+                          <td style={{ textAlign: 'center' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isSelected} 
+                              onChange={() => handleToggleSelectPulang(r.id)}
+                              style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#00838F' }}
+                            />
+                          </td>
+                          <td>{r.timestamp}</td>
+                          <td>{r.email}</td>
+                          <td style={{ fontWeight: 700 }}>{r.userName}</td>
+                          {attendanceCategory === 'SHIFT' && (
+                            <td>
+                              <span style={{ 
+                                padding: '2px 8px', 
+                                borderRadius: '6px', 
+                                fontSize: '0.75rem', 
+                                fontWeight: 700, 
+                                backgroundColor: r.shiftType === 'MALAM' ? '#1E1B4B' : r.shiftType === 'SORE' ? '#FEF3C7' : '#E0F7FA',
+                                color: r.shiftType === 'MALAM' ? '#C7D2FE' : r.shiftType === 'SORE' ? '#B45309' : '#00838F'
+                              }}>
+                                {r.shiftName || r.shiftType || 'Shift'}
+                              </span>
+                            </td>
+                          )}
                           <td>
-                            <span style={{ 
-                              padding: '2px 8px', 
-                              borderRadius: '6px', 
-                              fontSize: '0.75rem', 
-                              fontWeight: 700, 
-                              backgroundColor: r.shiftType === 'MALAM' ? '#1E1B4B' : r.shiftType === 'SORE' ? '#FEF3C7' : '#E0F7FA',
-                              color: r.shiftType === 'MALAM' ? '#C7D2FE' : r.shiftType === 'SORE' ? '#B45309' : '#00838F'
-                            }}>
-                              {r.shiftName || r.shiftType || 'Shift'}
+                            {r.evidenceUrl ? (
+                              <a href={r.evidenceUrl} target="_blank" rel="noreferrer" className="drive-link-btn">
+                                <span>Drive Link</span>
+                                <ExternalLink size={12} />
+                              </a>
+                            ) : '-'}
+                          </td>
+                          <td style={{ color: '#64748B', fontSize: '0.78rem' }}>{r.compositeKey}</td>
+                          <td>{r.date}</td>
+                          <td style={{ fontWeight: 700, color: '#DC2626' }}>{r.time}</td>
+                          <td>
+                            <span className={`badge-status ${r.isEarly ? 'early' : 'ontime'}`}>
+                              {r.status}
                             </span>
                           </td>
-                        )}
-                        <td>
-                          {r.evidenceUrl ? (
-                            <a href={r.evidenceUrl} target="_blank" rel="noreferrer" className="drive-link-btn">
-                              <span>Drive Link</span>
-                              <ExternalLink size={12} />
-                            </a>
-                          ) : '-'}
-                        </td>
-                        <td style={{ color: '#64748B', fontSize: '0.78rem' }}>{r.compositeKey}</td>
-                        <td>{r.date}</td>
-                        <td style={{ fontWeight: 700, color: '#DC2626' }}>{r.time}</td>
-                        <td>
-                          <span className={`badge-status ${r.isEarly ? 'early' : 'ontime'}`}>
-                            {r.status}
-                          </span>
-                        </td>
-                        <td style={{ fontWeight: 800, color: attendanceCategory === 'SHIFT' ? '#7C3AED' : '#00838F' }}>
-                          {r.workDuration || '-'}
-                        </td>
-                      </tr>
-                    ))
+                          <td style={{ fontWeight: 800, color: attendanceCategory === 'SHIFT' ? '#7C3AED' : '#00838F' }}>
+                            {r.workDuration || '-'}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSinglePulang(r)}
+                              title="Hapus data presensi ini"
+                              style={{
+                                background: '#FEE2E2',
+                                border: '1px solid #FECACA',
+                                borderRadius: '6px',
+                                color: '#DC2626',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700
+                              }}
+                            >
+                              <Trash2 size={13} />
+                              <span>Hapus</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

@@ -422,6 +422,28 @@ export function AttendanceProvider({ children }) {
     showToast('Pengaturan sistem berhasil disimpan!', 'success');
   };
 
+  /**
+   * Delete attendance records (single or bulk)
+   */
+  const deleteAttendanceRecords = async (recordIds = []) => {
+    const list = Array.isArray(recordIds) ? recordIds : [recordIds];
+    if (list.length === 0) return { success: false };
+
+    // 1. Update localStorage and React state
+    const updated = storageService.deleteAttendanceRecords(list);
+    setRecords(updated);
+
+    // 2. Sync deletion to cloud database
+    try {
+      await cloudApiService.deleteAttendance(list);
+    } catch (err) {
+      console.warn('Sync delete attendance error:', err);
+    }
+
+    showToast(`${list.length} data presensi berhasil dihapus!`, 'success');
+    return { success: true, count: list.length };
+  };
+
   return (
     <AttendanceContext.Provider
       value={{
@@ -442,6 +464,7 @@ export function AttendanceProvider({ children }) {
         doCheckIn,
         doCheckOut,
         submitLeave,
+        deleteAttendanceRecords,
         handleExportExcel,
         updateSettings,
         refreshAttendanceFromCloud

@@ -56,12 +56,16 @@ graph TD
 
 ## 📁 2. Hierarki Struktur Folder Penyimpanan Google Drive
 
-Penyimpanan foto bukti presensi dirancang otomatis tersusun rapi berdasarkan hierarki bertingkat:
+Penyimpanan foto bukti presensi dan foto profil pegawai dirancang otomatis tersusun rapi berdasarkan hierarki bertingkat:
 
 ```text
 📁 [Folder Induk Google Drive] (ID Folder Utama di Pengaturan Admin)
    │
-   └── 📁 2026/                                      <-- Level 1: Tahun
+   ├── 📁 Profil pegawai/                            <-- Direktori Khusus Foto Profil Pegawai
+   │   ├── 📷 AGUNG_SISWOYO_19940731202522093.jpg
+   │   └── 📷 PEGAWAI_LAIN_NIP.jpg
+   │
+   └── 📁 2026/                                      <-- Level 1: Tahun (Bukti Kehadiran)
        │
        └── 📁 09-September/                          <-- Level 2: Bulan (Format: MM-NamaBulan)
            │
@@ -77,9 +81,15 @@ Penyimpanan foto bukti presensi dirancang otomatis tersusun rapi berdasarkan hie
 ```
 
 ### Format Standar Penamaan File Foto (.jpg):
-- **Formula**: `[NAMA_PEGAWAI]_[TIMESTAMP/COMPOSITE_KEY]_[TIPE].jpg`
-- **Contoh Masuk**: `AGUNG_SISWOYO_46273_Masuk.jpg`
-- **Contoh Pulang**: `AGUNG_SISWOYO_46273_Pulang.jpg`
+1. **Foto Profil Pegawai**:
+   - **Lokasi Folder**: `[Folder Utama] / Profil pegawai/`
+   - **Formula**: `{NAMA_PEGAWAI}_{NIP}.jpg`
+   - **Contoh**: `AGUNG_SISWOYO_19940731202522093.jpg`
+2. **Foto Bukti Presensi (Masuk & Pulang)**:
+   - **Lokasi Folder**: `[Folder Utama] / {TAHUN} / {BULAN} / {TANGGAL} / {KATEGORI}/`
+   - **Formula**: `[NAMA_PEGAWAI]_[TIMESTAMP/COMPOSITE_KEY]_[TIPE].jpg`
+   - **Contoh Masuk**: `AGUNG_SISWOYO_46273_Masuk.jpg`
+   - **Contoh Pulang**: `AGUNG_SISWOYO_46273_Pulang.jpg`
 
 ### Mekanisme Kolom Bukti Kehadiran (`evidence_url`):
 1. **Link File Langsung**: Dihasilkan saat file foto berhasil diunggah ke storage cloud fisik (Google Drive API / RustFS Dedicated Server). Format URL: `https://drive.google.com/file/d/{fileId}/view` atau `https://rustfs.server/.../foto.jpg`.

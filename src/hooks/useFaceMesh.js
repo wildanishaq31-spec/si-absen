@@ -17,18 +17,18 @@ function getDistance(p1, p2) {
  */
 function calculateEAR(landmarks, eyeIndices) {
   const [p1, p2, p3, p4, p5, p6] = eyeIndices.map(idx => landmarks[idx]);
-  if (!p1 || !p2 || !p3 || !p4 || !p5 || !p6) return 0.3;
+  if (!p1 || !p2 || !p3 || !p4 || !p5 || !p6) return 0.28;
   const vertical1 = getDistance(p2, p6);
   const vertical2 = getDistance(p3, p5);
   const horizontal = getDistance(p1, p4);
-  if (horizontal === 0) return 0.3;
+  if (horizontal === 0) return 0.28;
   return (vertical1 + vertical2) / (2.0 * horizontal);
 }
 
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
 const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
 
-// Clean aesthetic contour landmark indices matching SIPP
+// Precise feature contours matching SIPP
 const CONTOUR_LANDMARKS = [
   // 1. Face Oval / Jawline
   10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
@@ -60,10 +60,11 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
   const faceMeshRef = useRef(null);
   const animationFrameRef = useRef(null);
   const blinkTrackerRef = useRef({
-    openedOnce: false,
-    closedOnce: false,
+    baselineEAR: 0.28,
+    hasBeenOpen: false,
+    hasClosed: false,
     closedTimestamp: null,
-    blinkCount: 0
+    consecutiveClosedFrames: 0
   });
   const verifiedRef = useRef(false);
 
@@ -74,10 +75,11 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     setIsVerified(false);
     setProgress(0);
     blinkTrackerRef.current = {
-      openedOnce: false,
-      closedOnce: false,
+      baselineEAR: 0.28,
+      hasBeenOpen: false,
+      hasClosed: false,
       closedTimestamp: null,
-      blinkCount: 0
+      consecutiveClosedFrames: 0
     };
 
     if (!isActive) {
@@ -175,7 +177,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       try {
         await faceMeshRef.current.send({ image: video });
       } catch (err) {
-        // Ignore single frame dropped
+        // Continue loop
       }
     }
 
@@ -193,7 +195,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     };
   }, [isModelLoading, isActive, runDetection]);
 
-  // Process Landmarks, Draw Green Dots on contours only, and Instant Blink Verification
+  // Process Landmarks, Enforce Frontal Head Pose, and Detect Instant 1x Blink
   const processFaceResults = (results) => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
@@ -210,19 +212,40 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       setProgress(0);
       setPromptText('Posisikan Wajah');
       setPromptSubtitle('Arahkan wajah ke dalam lingkaran');
-      blinkTrackerRef.current = { openedOnce: false, closedOnce: false, closedTimestamp: null, blinkCount: 0 };
+      blinkTrackerRef.current.hasClosed = false;
+      blinkTrackerRef.current.consecutiveClosedFrames = 0;
       return;
     }
 
     const landmarks = results.multiFaceLandmarks[0];
     setFaceDetected(true);
 
-    // Check if face is roughly centered inside the oval guide
+    // 1. Strict Head Pose & Frontal Face Alignment Check (Mencegah Hadap Samping/Miring)
     const noseTip = landmarks[1];
-    const isCentered = noseTip && noseTip.x > 0.25 && noseTip.x < 0.75 && noseTip.y > 0.20 && noseTip.y < 0.80;
-    setFaceInGuide(isCentered);
+    const leftCheek = landmarks[234];
+    const rightCheek = landmarks[454];
+    const leftEye = landmarks[133];
+    const rightEye = landmarks[362];
 
-    // Draw ONLY clean facial contour green dots (exact match with SIPP screenshot!)
+    if (!noseTip || !leftCheek || !rightCheek || !leftEye || !rightEye) {
+      return;
+    }
+
+    const leftDist = Math.abs(noseTip.x - leftCheek.x);
+    const rightDist = Math.abs(rightCheek.x - noseTip.x);
+    const symmetryRatio = leftDist / (rightDist + 0.0001);
+    const eyeTilt = Math.abs(leftEye.y - rightEye.y);
+
+    // If head is turned sideways (Yaw angle > 25 deg)
+    const isFacingSideways = symmetryRatio < 0.60 || symmetryRatio > 1.65;
+    // If head is tilted heavily (Roll angle)
+    const isHeadTilted = eyeTilt > 0.09;
+    // Check if nose is inside frame
+    const isCentered = noseTip.x > 0.22 && noseTip.x < 0.78 && noseTip.y > 0.18 && noseTip.y < 0.82;
+
+    setFaceInGuide(isCentered && !isFacingSideways && !isHeadTilted);
+
+    // Draw ONLY clean facial contour green dots (exact SIPP look)
     ctx.save();
     ctx.fillStyle = '#4ADE80';
     ctx.shadowColor = '#22C55E';
@@ -241,50 +264,81 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     }
     ctx.restore();
 
-    if (!isCentered) {
-      setPromptText('Posisikan Wajah di Tengah');
-      setPromptSubtitle('Arahkan wajah ke dalam lingkaran panduan');
-      setProgress(20);
+    // Check constraints before processing blink
+    if (isFacingSideways) {
+      setPromptText('Hadapkan Wajah Lurus');
+      setPromptSubtitle('Jangan menghadap ke samping');
+      setProgress(0);
+      blinkTrackerRef.current.hasClosed = false;
       return;
     }
 
-    // Liveness: Fast Instant Eye Blink Verification
+    if (isHeadTilted) {
+      setPromptText('Posisikan Kepala Tegak');
+      setPromptSubtitle('Jangan memiringkan kepala');
+      setProgress(0);
+      blinkTrackerRef.current.hasClosed = false;
+      return;
+    }
+
+    if (!isCentered) {
+      setPromptText('Posisikan Wajah di Tengah');
+      setPromptSubtitle('Arahkan wajah ke dalam lingkaran panduan');
+      setProgress(15);
+      blinkTrackerRef.current.hasClosed = false;
+      return;
+    }
+
+    // 2. High Precision Dynamic 1x Blink Detection
     const leftEAR = calculateEAR(landmarks, LEFT_EYE);
     const rightEAR = calculateEAR(landmarks, RIGHT_EYE);
-    const avgEAR = (leftEAR + rightEAR) / 2.0;
+    const currentEAR = (leftEAR + rightEAR) / 2.0;
 
-    const BLINK_CLOSE_THRESHOLD = 0.20; // Closed eyes threshold
-    const BLINK_OPEN_THRESHOLD = 0.23;  // Open eyes threshold
+    const tracker = blinkTrackerRef.current;
+
+    // Dynamically update baseline open eye EAR
+    if (currentEAR > 0.24) {
+      tracker.baselineEAR = tracker.baselineEAR * 0.9 + currentEAR * 0.1;
+      tracker.hasBeenOpen = true;
+    }
+
+    // Adaptive closed eye threshold based on personal baseline
+    const closeThreshold = Math.min(0.22, Math.max(0.16, tracker.baselineEAR * 0.72));
+    const openThreshold = closeThreshold + 0.03;
 
     setPromptText('Kedipkan Mata');
     setPromptSubtitle('(Tahan 1 Detik)');
 
-    const tracker = blinkTrackerRef.current;
-
-    if (avgEAR >= BLINK_OPEN_THRESHOLD) {
-      tracker.openedOnce = true;
-      if (tracker.closedOnce && !verifiedRef.current) {
-        // Natural blink completed (Open -> Closed -> Open)
-        tracker.blinkCount += 1;
-        setProgress(100);
-        handleVerificationSuccess();
-        return;
-      }
-    } else if (avgEAR < BLINK_CLOSE_THRESHOLD && tracker.openedOnce) {
-      tracker.closedOnce = true;
+    if (currentEAR <= closeThreshold) {
+      // Eyes are closed
+      tracker.hasClosed = true;
+      tracker.consecutiveClosedFrames += 1;
       if (!tracker.closedTimestamp) {
         tracker.closedTimestamp = Date.now();
       }
       
       const closedDuration = Date.now() - tracker.closedTimestamp;
-      const pct = Math.min(100, Math.round((closedDuration / 250) * 100));
+      const pct = Math.min(100, Math.round((closedDuration / 200) * 100));
       setProgress(pct);
 
-      // If closed for just 200ms+ (1 quick deliberate blink), verify instantly!
-      if (closedDuration >= 200 && !verifiedRef.current) {
+      // If closed for 150ms+ (deliberate single blink hold), verify instantly!
+      if ((closedDuration >= 150 || tracker.consecutiveClosedFrames >= 3) && !verifiedRef.current) {
         setProgress(100);
         handleVerificationSuccess();
       }
+    } else if (currentEAR >= openThreshold) {
+      // Eyes are currently open
+      if (tracker.hasBeenOpen && tracker.hasClosed && !verifiedRef.current) {
+        // Natural 1x quick blink completed! (Open -> Closed -> Reopened)
+        setProgress(100);
+        handleVerificationSuccess();
+        return;
+      }
+      
+      // Reset closed tracking if eyes remain open without verification
+      tracker.hasClosed = false;
+      tracker.closedTimestamp = null;
+      tracker.consecutiveClosedFrames = 0;
     }
   };
 
@@ -306,7 +360,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     if (onLivenessSuccess) {
       setTimeout(() => {
         onLivenessSuccess();
-      }, 300);
+      }, 200);
     }
   };
 

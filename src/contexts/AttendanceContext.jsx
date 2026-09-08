@@ -19,17 +19,10 @@ export function AttendanceProvider({ children }) {
   const refreshAttendanceFromCloud = useCallback(async () => {
     try {
       const cloudData = await cloudApiService.fetchAllData();
-      if (cloudData && Array.isArray(cloudData.attendance) && cloudData.attendance.length > 0) {
-        const localRecords = storageService.getAttendance();
-        const mergedMap = new Map();
-        localRecords.forEach(r => mergedMap.set(r.compositeKey || r.id, r));
-        cloudData.attendance.forEach(cr => {
-          const key = cr.compositeKey || cr.id;
-          mergedMap.set(key, { ...cr });
-        });
-        const mergedList = Array.from(mergedMap.values());
-        storageService.saveAttendance(mergedList);
-        setRecords(mergedList);
+      if (cloudData && Array.isArray(cloudData.attendance)) {
+        // Cloud database is authoritative source: update local storage and state directly
+        storageService.saveAttendance(cloudData.attendance);
+        setRecords(cloudData.attendance);
       }
     } catch (err) {
       console.warn('Gagal sinkronisasi data presensi dari Vercel Postgres:', err);

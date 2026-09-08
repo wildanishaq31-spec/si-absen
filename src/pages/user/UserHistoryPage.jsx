@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Bell, CheckSquare, Calendar, ChevronDown, 
   LogIn, LogOut, User, Clock, MapPin, Smartphone, 
@@ -10,7 +10,14 @@ import { formatDateDMY, formatDateYMD } from '../../utils/formatters';
 
 export function UserHistoryPage({ onNavigateBack }) {
   const { currentUser } = useAuth();
-  const { records } = useAttendance();
+  const { records, refreshAttendanceFromCloud } = useAttendance();
+
+  // Auto-sync latest attendance from database on mount
+  useEffect(() => {
+    if (refreshAttendanceFromCloud) {
+      refreshAttendanceFromCloud();
+    }
+  }, [refreshAttendanceFromCloud]);
 
   // Selected date filter (default: current date)
   const [selectedDate, setSelectedDate] = useState(() => formatDateYMD(new Date()));

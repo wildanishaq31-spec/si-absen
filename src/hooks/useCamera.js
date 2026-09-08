@@ -2,28 +2,59 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 
 export function useCamera() {
   const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const [stream, setStream] = useState(null);
   const [cameraError, setCameraError] = useState(null);
   const [facingMode, setFacingMode] = useState('user'); // 'user' (front) or 'environment' (back)
   const [isReady, setIsReady] = useState(false);
 
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        try {
+          track.stop();
+        } catch (e) {
+          console.warn('Error stopping track:', e);
+        }
+      });
+      streamRef.current = null;
+    }
+    setStream(null);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsReady(false);
+  }, []);
+
   const startCamera = useCallback(async (preferredFacing = 'user') => {
     setCameraError(null);
     setIsReady(false);
 
+    // Stop any existing stream first
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        try {
+          track.stop();
+        } catch (e) {
+          console.warn('Error stopping track:', e);
+        }
+      });
+      streamRef.current = null;
+    }
+
     try {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Kamera langsung di browser hanya bisa berjalan di protokol HTTPS yang aman atau localhost. Buka URL HTTPS (Vercel) atau gunakan tombol Ambil Foto HP.');
       }
 
-      // Constraints with fallbacks
+      // Constraints with fallbacks (prefer front camera, flexible resolution)
       let mediaStream = null;
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: preferredFacing,
-            width: { ideal: 640 },
-            height: { ideal: 640 }
+            facingMode: { ideal: preferredFacing },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
           },
           audio: false
         });
@@ -35,14 +66,21 @@ export function useCamera() {
         });
       }
 
+      streamRef.current = mediaStream;
       setStream(mediaStream);
+      setFacingMode(preferredFacing);
 
       if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+        const video = videoRef.current;
+        video.srcObject = mediaStream;
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
         try {
-          await videoRef.current.play();
+          await video.play();
         } catch (e) {
-          console.log('Video play error:', e);
+          console.log('Video play error (will retry on loadedmetadata):', e);
         }
       }
       setIsReady(true);
@@ -54,21 +92,12 @@ export function useCamera() {
           : `Kamera tidak dapat diakses (${err.message}). Anda tetap dapat menggunakan tombol Ambil Foto HP.`
       );
     }
-  }, [stream]);
+  }, []);
 
-  const stopCamera = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-    setIsReady(false);
-  }, [stream]);
-
-  const toggleFacingMode = () => {
+  const toggleFacingMode = useCallback(() => {
     const nextMode = facingMode === 'user' ? 'environment' : 'user';
-    setFacingMode(nextMode);
     startCamera(nextMode);
-  };
+  }, [facingMode, startCamera]);
 
   /**
    * Captures image from video stream onto canvas
@@ -95,13 +124,21 @@ export function useCamera() {
     return canvas.toDataURL('image/jpeg', 0.85);
   }, [facingMode]);
 
+  // Clean up on unmount
   useEffect(() => {
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          try {
+            track.stop();
+          } catch (e) {
+            console.warn('Error stopping track on unmount:', e);
+          }
+        });
+        streamRef.current = null;
       }
     };
-  }, [stream]);
+  }, []);
 
   return {
     videoRef,

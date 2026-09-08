@@ -28,15 +28,21 @@ export function FaceCameraModal({ isOpen, onClose, onCaptureComplete, title = 'V
     } else {
       stopCamera();
     }
-  }, [isOpen, startCamera, stopCamera]);
+  }, [isOpen]);
 
-  // Connect stream to video element whenever stream changes
+  // Connect stream to video element whenever stream or video element is available
   useEffect(() => {
     if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(e => console.log('Autoplay handled:', e));
+      const video = videoRef.current;
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
+      }
+      video.muted = true;
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
+      video.play().catch(e => console.log('Autoplay handled:', e));
     }
-  }, [stream, videoRef]);
+  }, [stream, videoRef, previewImage]);
 
   // Simulate Biometric Scanning effect
   useEffect(() => {
@@ -142,11 +148,15 @@ export function FaceCameraModal({ isOpen, onClose, onCaptureComplete, title = 'V
                 autoPlay 
                 playsInline 
                 muted 
+                onLoadedMetadata={(e) => {
+                  e.currentTarget.play().catch(err => console.log('Video play error on metadata:', err));
+                }}
                 style={{
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover',
-                  transform: facingMode === 'user' ? 'scaleX(-1)' : 'none'
+                  transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+                  display: 'block'
                 }} 
               />
 

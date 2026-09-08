@@ -1,12 +1,20 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Camera, RefreshCw, X, Check, AlertTriangle, Scan, ShieldCheck, Image, Sparkles } from 'lucide-react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { ArrowLeft, RefreshCw, Check, AlertTriangle, ShieldCheck, Camera, Image, User, CreditCard, Sparkles } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { useCamera } from '../../hooks/useCamera';
+import { useFaceMesh } from '../../hooks/useFaceMesh';
+import { useAuth } from '../../contexts/AuthContext';
 
-export function FaceCameraModal({ isOpen, onClose, onCaptureComplete, title = 'Verifikasi Wajah' }) {
+export function FaceCameraModal({ 
+  isOpen, 
+  onClose, 
+  onCaptureComplete, 
+  title = 'Verifikasi Wajah Masuk' 
+}) {
+  const { currentUser } = useAuth();
   const {
     videoRef,
     stream,
-    isReady,
     cameraError,
     facingMode,
     startCamera,
@@ -15,22 +23,67 @@ export function FaceCameraModal({ isOpen, onClose, onCaptureComplete, title = 'V
     captureSnapshot
   } = useCamera();
 
-  const [previewImage, setPreviewImage] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [scanProgress, setScanProgress] = useState(0);
+  const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [successAnimation, setSuccessAnimation] = useState(false);
 
+  const handleLivenessSuccess = useCallback(() => {
+    // Automatically capture image on liveness verification!
+    const snap = captureSnapshot();
+    if (snap) {
+      setPreviewImage(snap);
+      setSuccessAnimation(true);
+      
+      // Trigger celebratory confetti
+      try {
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.6 }
+        });
+      } catch (e) {
+        // Confetti optional
+      }
+
+      // Auto submit after brief visual confirmation
+      setTimeout(() => {
+        onCaptureComplete(snap);
+        onClose();
+      }, 1000);
+    }
+  }, [captureSnapshot, onCaptureComplete, onClose]);
+
+  const {
+    isModelLoading,
+    faceDetected,
+    faceInGuide,
+    promptText,
+    promptSubtitle,
+    progress,
+    isVerified,
+    triggerManualSuccess
+  } = useFaceMesh({
+    videoRef,
+    canvasRef,
+    isActive: isOpen && !previewImage,
+    onLivenessSuccess: handleLivenessSuccess
+  });
+
+  // Start camera when modal opens
   useEffect(() => {
     if (isOpen) {
       setPreviewImage(null);
-      setScanProgress(0);
+      setSuccessAnimation(false);
+      setIsVerifying(false);
       startCamera('user');
     } else {
       stopCamera();
     }
   }, [isOpen]);
 
-  // Connect stream to video element whenever stream or video element is available
+  // Connect stream to video element whenever stream changes
   useEffect(() => {
     if (videoRef.current && stream) {
       const video = videoRef.current;
@@ -44,23 +97,18 @@ export function FaceCameraModal({ isOpen, onClose, onCaptureComplete, title = 'V
     }
   }, [stream, videoRef, previewImage]);
 
-  // Simulate Biometric Scanning effect
-  useEffect(() => {
-    if (isOpen && !previewImage) {
-      const interval = setInterval(() => {
-        setScanProgress(prev => (prev >= 100 ? 100 : prev + 25));
-      }, 400);
-      return () => clearInterval(interval);
-    }
-  }, [isOpen, previewImage]);
-
   if (!isOpen) return null;
 
-  const handleTakeSnap = () => {
+  // Manual snapshot fallback
+  const handleManualSnap = () => {
     const snap = captureSnapshot();
     if (snap) {
       setPreviewImage(snap);
-      stopCamera();
+      setSuccessAnimation(true);
+      setTimeout(() => {
+        onCaptureComplete(snap);
+        onClose();
+      }, 700);
     }
   };
 
@@ -79,106 +127,256 @@ export function FaceCameraModal({ isOpen, onClose, onCaptureComplete, title = 'V
         ctx.drawImage(img, 0, 0, 640, 640);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         setPreviewImage(dataUrl);
-        stopCamera();
+        setSuccessAnimation(true);
+        setTimeout(() => {
+          onCaptureComplete(dataUrl);
+          onClose();
+        }, 800);
       };
       img.src = event.target.result;
     };
     reader.readAsDataURL(file);
   };
 
-  const handleRetake = () => {
-    setPreviewImage(null);
-    setScanProgress(0);
-    startCamera(facingMode);
-  };
-
-  const handleConfirm = () => {
-    if (!previewImage) return;
-    setSubmitting(true);
-    setTimeout(() => {
-      onCaptureComplete(previewImage);
-      setSubmitting(false);
-      onClose();
-    }, 400);
-  };
+  const employeeName = currentUser?.name || 'AGUNG SISWOYO';
+  const employeeNip = currentUser?.nip || '199407312025211093';
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-sheet" style={{ maxHeight: '95vh' }}>
-        <div className="modal-drag-indicator" />
+    <div 
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: '#000000',
+        zIndex: 9999,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        fontFamily: "'Inter', sans-serif",
+        overflow: 'hidden'
+      }}
+    >
+      {/* Top Header Bar */}
+      <div 
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '16px 20px',
+          backgroundColor: '#000000',
+          color: '#FFFFFF',
+          zIndex: 30
+        }}
+      >
+        <button 
+          onClick={onClose}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: '#FFFFFF',
+            cursor: 'pointer',
+            padding: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <ArrowLeft size={24} />
+        </button>
 
-        {/* Modal Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#E0F7FA', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00838F' }}>
-              <Scan size={20} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#00838F', margin: 0 }}>{title}</h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0 }}>Posisikan wajah Anda tepat di dalam lingkaran panduan</p>
-            </div>
-          </div>
-          <button 
-            onClick={onClose}
-            style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-          >
-            <X size={18} color="#475569" />
-          </button>
+        <h2 
+          style={{
+            margin: 0,
+            fontSize: '1.05rem',
+            fontWeight: 800,
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            color: '#FFFFFF'
+          }}
+        >
+          {title.toUpperCase()}
+        </h2>
+
+        {/* Camera indicator */}
+        <div style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div 
+            style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              backgroundColor: isVerified ? '#22C55E' : '#4ADE80',
+              boxShadow: '0 0 10px #22C55E'
+            }} 
+          />
         </div>
+      </div>
 
-        {/* Camera Feed or Captured Preview */}
-        <div className="camera-view-container" style={{ position: 'relative', height: '360px', borderRadius: '20px', overflow: 'hidden', background: '#0F172A' }}>
-          {previewImage ? (
-            <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-              <img 
-                src={previewImage} 
-                alt="Hasil Verifikasi Wajah" 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-              />
-              <div style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', background: 'rgba(6, 95, 70, 0.85)', backdropFilter: 'blur(4px)', color: '#FFF', padding: '8px 14px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700 }}>
-                <ShieldCheck size={18} color="#34D399" />
-                <span>Wajah Berhasil Terverifikasi</span>
+      {/* Main Camera / Face Verification Viewport */}
+      <div 
+        style={{
+          position: 'relative',
+          flex: '1 1 auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          backgroundColor: '#0B0F19'
+        }}
+      >
+        {previewImage ? (
+          /* Captured Photo Result Preview */
+          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+            <img 
+              src={previewImage} 
+              alt="Verifikasi Wajah Berhasil"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+            <div 
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundColor: 'rgba(16, 185, 129, 0.25)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px'
+              }}
+            >
+              <div 
+                style={{
+                  width: '70px',
+                  height: '70px',
+                  borderRadius: '50%',
+                  backgroundColor: '#10B981',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#FFF',
+                  boxShadow: '0 0 25px #10B981'
+                }}
+              >
+                <Check size={40} strokeWidth={3} />
+              </div>
+              <div 
+                style={{
+                  backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                  backdropFilter: 'blur(8px)',
+                  padding: '8px 18px',
+                  borderRadius: '20px',
+                  color: '#FFF',
+                  fontWeight: 800,
+                  fontSize: '0.95rem'
+                }}
+              >
+                Wajah Berhasil Diverifikasi!
               </div>
             </div>
-          ) : (
-            <>
-              {/* Video Element */}
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                muted 
-                onLoadedMetadata={(e) => {
-                  e.currentTarget.play().catch(err => console.log('Video play error on metadata:', err));
-                }}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
-                  display: 'block'
-                }} 
-              />
+          </div>
+        ) : (
+          /* Live Stream & FaceMesh Canvas */
+          <>
+            <video 
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              onLoadedMetadata={(e) => {
+                e.currentTarget.play().catch(console.warn);
+              }}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none'
+              }}
+            />
 
-              {/* Face Oval Guideline Overlay */}
-              <div className="face-oval-guide" style={{
+            {/* MediaPipe Green Face Mesh Canvas Overlay */}
+            <canvas 
+              ref={canvasRef}
+              style={{
                 position: 'absolute',
-                top: '50%',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                pointerEvents: 'none',
+                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+                zIndex: 10
+              }}
+            />
+
+            {/* Top Prompt Floating Card ("Kedipkan Mata (Tahan 1 Detik)") */}
+            <div 
+              style={{
+                position: 'absolute',
+                top: '20px',
+                left: '20px',
+                right: '20px',
+                backgroundColor: 'rgba(24, 24, 27, 0.80)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '24px',
+                padding: '14px 20px',
+                textAlign: 'center',
+                color: '#FFFFFF',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                zIndex: 20
+              }}
+            >
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '0.3px', color: '#FFFFFF' }}>
+                {promptText}
+              </div>
+              <div style={{ fontSize: '0.88rem', color: '#A1A1AA', marginTop: '2px', fontWeight: 500 }}>
+                {promptSubtitle}
+              </div>
+              {progress > 0 && progress < 100 && (
+                <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px', marginTop: '10px', overflow: 'hidden' }}>
+                  <div 
+                    style={{
+                      height: '100%',
+                      width: `${progress}%`,
+                      backgroundColor: '#22C55E',
+                      transition: 'width 0.15s ease'
+                    }} 
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Glowing Face Oval Guide */}
+            <div 
+              style={{
+                position: 'absolute',
+                top: '46%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
-                width: '200px',
-                height: '260px',
-                border: '3px dashed #34D399',
+                width: '240px',
+                height: '320px',
                 borderRadius: '50%',
-                boxShadow: '0 0 0 9999px rgba(15, 23, 42, 0.45)',
+                border: isVerified 
+                  ? '3px solid #22C55E' 
+                  : faceDetected 
+                    ? '3px solid #34D399' 
+                    : '3px dashed #64748B',
+                boxShadow: isVerified
+                  ? '0 0 30px #22C55E, inset 0 0 20px rgba(34, 197, 94, 0.3)'
+                  : faceDetected
+                    ? '0 0 25px rgba(52, 211, 153, 0.5)'
+                    : 'none',
                 pointerEvents: 'none',
+                zIndex: 15,
+                transition: 'all 0.3s ease',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden'
-              }}>
-                {/* Laser Scanning Animation Bar */}
-                <div style={{
+              }}
+            >
+              {/* Laser Scanning Animation Bar */}
+              <div 
+                style={{
                   position: 'absolute',
                   left: 0,
                   right: 0,
@@ -186,190 +384,286 @@ export function FaceCameraModal({ isOpen, onClose, onCaptureComplete, title = 'V
                   background: 'linear-gradient(90deg, transparent, #22C55E, #00ACC1, #22C55E, transparent)',
                   boxShadow: '0 0 15px #22C55E',
                   animation: 'faceLaserScan 2s infinite ease-in-out'
-                }} />
-              </div>
+                }} 
+              />
+            </div>
 
-              {/* Status Header Badge on Camera */}
-              <div style={{
-                position: 'absolute',
-                top: '12px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: 'rgba(15, 23, 42, 0.75)',
-                backdropFilter: 'blur(6px)',
-                color: '#FFF',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                border: '1px solid rgba(255,255,255,0.15)',
-                zIndex: 10
-              }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22C55E', boxShadow: '0 0 8px #22C55E' }} />
-                <span>{scanProgress >= 100 ? '✨ Wajah Terdeteksi (Siap Foto)' : 'Memindai Biometrik...'}</span>
-              </div>
-
-              {/* Camera Error Fallback Message */}
-              {cameraError && (
-                <div 
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    backgroundColor: 'rgba(15, 23, 42, 0.92)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '24px',
-                    textAlign: 'center',
-                    color: '#FFF',
-                    gap: '14px',
-                    zIndex: 20
-                  }}
-                >
-                  <AlertTriangle size={40} color="#FBBF24" />
-                  <p style={{ fontSize: '0.85rem', lineHeight: 1.4 }}>{cameraError}</p>
-                  
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button 
-                      onClick={() => startCamera()}
-                      style={{
-                        backgroundColor: '#00838F',
-                        color: '#FFF',
-                        border: 'none',
-                        padding: '10px 18px',
-                        borderRadius: '10px',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Coba Lagi
-                    </button>
-
-                    <button 
-                      onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                      style={{
-                        backgroundColor: '#10B981',
-                        color: '#FFF',
-                        border: 'none',
-                        padding: '10px 18px',
-                        borderRadius: '10px',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <Camera size={16} /> Buka Kamera HP
-                    </button>
-                  </div>
+            {/* Camera Error Fallback */}
+            {cameraError && (
+              <div 
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '24px',
+                  textAlign: 'center',
+                  color: '#FFF',
+                  gap: '14px',
+                  zIndex: 40
+                }}
+              >
+                <AlertTriangle size={44} color="#FBBF24" />
+                <p style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>{cameraError}</p>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                  <button 
+                    onClick={() => startCamera()}
+                    style={{
+                      backgroundColor: '#00838F',
+                      color: '#FFF',
+                      border: 'none',
+                      padding: '12px 20px',
+                      borderRadius: '12px',
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Coba Lagi
+                  </button>
+                  <button 
+                    onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                    style={{
+                      backgroundColor: '#10B981',
+                      color: '#FFF',
+                      border: 'none',
+                      padding: '12px 20px',
+                      borderRadius: '12px',
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <Camera size={18} /> Buka Kamera HP
+                  </button>
                 </div>
-              )}
-            </>
-          )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Hidden File Input for Native Camera App Fallback */}
+      <input 
+        ref={fileInputRef}
+        type="file" 
+        accept="image/*" 
+        capture="user" 
+        onChange={handleNativeFileUpload}
+        style={{ display: 'none' }} 
+      />
+
+      {/* Bottom Section: Employee Identity Card (Exactly as in SIPP Screenshot) */}
+      <div 
+        style={{
+          backgroundColor: '#0B1528',
+          borderTopLeftRadius: '28px',
+          borderTopRightRadius: '28px',
+          padding: '18px 20px 24px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '14px',
+          boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.5)',
+          zIndex: 30
+        }}
+      >
+        {/* Top Handle Indicator */}
+        <div style={{ width: '40px', height: '4px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px' }} />
+
+        {/* Circular Avatar with Red Badge Border */}
+        <div 
+          style={{
+            width: '82px',
+            height: '82px',
+            borderRadius: '50%',
+            backgroundColor: '#0C203E',
+            border: '3px solid #1E3A8A',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+            overflow: 'hidden',
+            position: 'relative'
+          }}
+        >
+          {/* Red inner circle badge */}
+          <div 
+            style={{
+              width: '68px',
+              height: '68px',
+              borderRadius: '50%',
+              backgroundColor: '#DC2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden'
+            }}
+          >
+            {currentUser?.photo ? (
+              <img 
+                src={currentUser.photo} 
+                alt={employeeName} 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+              />
+            ) : (
+              <div 
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#B91C1C',
+                  color: '#FFFFFF',
+                  fontSize: '1.6rem',
+                  fontWeight: 800
+                }}
+              >
+                {employeeName.charAt(0)}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Hidden File Input for Native HP Camera Direct Fallback */}
-        <input 
-          ref={fileInputRef}
-          type="file" 
-          accept="image/*" 
-          capture="user" 
-          onChange={handleNativeFileUpload}
-          style={{ display: 'none' }} 
-        />
-
-        {/* Action Controls */}
-        {previewImage ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: '12px' }}>
-            <button
-              onClick={handleRetake}
+        {/* Employee Info Box Container */}
+        <div 
+          style={{
+            width: '100%',
+            maxWidth: '380px',
+            backgroundColor: '#0F213E',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '16px',
+            padding: '14px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}
+        >
+          {/* Row 1: Nama */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div 
               style={{
-                background: '#F1F5F9',
-                border: '1px solid #CBD5E1',
-                color: '#334155',
-                padding: '13px',
-                borderRadius: '14px',
-                fontWeight: 700,
-                fontSize: '0.9rem',
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(255, 255, 255, 0.06)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                color: '#94A3B8'
+              }}
+            >
+              <User size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600 }}>Nama</div>
+              <div style={{ fontSize: '0.95rem', color: '#FFFFFF', fontWeight: 800, letterSpacing: '0.3px' }}>
+                {employeeName}
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: NIP */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div 
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#94A3B8'
+              }}
+            >
+              <CreditCard size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600 }}>NIP</div>
+              <div style={{ fontSize: '0.92rem', color: '#FFFFFF', fontWeight: 700, letterSpacing: '0.5px' }}>
+                {employeeNip}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Action Controls (Switch Camera / Manual Snapshot / Native Camera) */}
+        {!previewImage && (
+          <div 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              maxWidth: '320px',
+              paddingTop: '6px'
+            }}
+          >
+            {/* Flip camera */}
+            <button 
+              onClick={toggleFacingMode}
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 cursor: 'pointer'
               }}
-            >
-              <RefreshCw size={18} /> Foto Ulang
-            </button>
-
-            <button
-              onClick={handleConfirm}
-              disabled={submitting}
-              style={{
-                background: 'linear-gradient(135deg, #0097A7, #00838F)',
-                border: 'none',
-                color: '#FFFFFF',
-                padding: '13px',
-                borderRadius: '14px',
-                fontWeight: 800,
-                fontSize: '0.95rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(0, 151, 167, 0.35)'
-              }}
-            >
-              {submitting ? 'Menyimpan Presensi...' : <><Check size={20} /> Konfirmasi & Absen</>}
-            </button>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px 0 12px' }}>
-            {/* Toggle Camera (Front / Back) */}
-            <button 
-              className="icon-btn" 
-              onClick={toggleFacingMode} 
               title="Ganti Kamera Depan/Belakang"
-              style={{ width: '46px', height: '46px' }}
             >
               <RefreshCw size={20} />
             </button>
 
-            {/* Big Shutter Snapshot Button */}
+            {/* Manual Shutter Button (Takes instant photo if needed) */}
             <button 
-              onClick={handleTakeSnap}
-              title="Ambil Foto Verifikasi Wajah"
+              onClick={handleManualSnap}
               style={{
-                width: '74px',
-                height: '74px',
+                width: '64px',
+                height: '64px',
                 borderRadius: '50%',
                 background: 'linear-gradient(135deg, #00ACC1, #00838F)',
-                border: '5px solid #E0F7FA',
+                border: '4px solid #E0F7FA',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#FFFFFF',
                 cursor: 'pointer',
-                boxShadow: '0 8px 20px rgba(0, 131, 143, 0.35)',
-                transition: 'transform 0.15s'
+                boxShadow: '0 4px 18px rgba(0, 131, 143, 0.4)'
               }}
+              title="Ambil Foto Manual"
             >
-              <Camera size={34} />
+              <Camera size={28} />
             </button>
 
-            {/* Native HP Camera App / Gallery Trigger */}
+            {/* Native HP Camera App Trigger */}
             <button 
-              className="icon-btn" 
-              onClick={() => fileInputRef.current && fileInputRef.current.click()} 
-              title="Buka Kamera Bawaan HP"
-              style={{ width: '46px', height: '46px' }}
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+              title="Buka Kamera HP"
             >
               <Image size={20} />
             </button>

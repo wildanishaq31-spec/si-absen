@@ -266,10 +266,13 @@ export function AttendanceProvider({ children }) {
     const updated = storageService.addAttendance(newRecord);
     setRecords([newRecord, ...records.filter(r => r.id !== newRecord.id)]);
 
-    // Sync to Cloud Vercel Backend
-    if (settings.storageProvider === 'GOOGLE' || settings.googleSpreadsheetUrl) {
-      cloudApiService.syncAttendance(newRecord, settings.googleSpreadsheetUrl, settings.googleDriveFolderUrl);
-    }
+    // Sync to Cloud Vercel Backend & Google Drive/Sheets
+    cloudApiService.syncAttendance(
+      newRecord,
+      settings?.googleSpreadsheetUrl,
+      settings?.googleDriveFolderUrl,
+      settings?.gasWebhookUrl
+    );
 
     triggerSuccessAnimation();
     showToast(`Presensi ${isShift ? shiftLabel : 'Masuk'} Berhasil! Status: ${evaluation.status}`, 'success');
@@ -357,10 +360,13 @@ export function AttendanceProvider({ children }) {
     const updated = storageService.addAttendance(newRecord);
     setRecords([newRecord, ...records.filter(r => r.id !== newRecord.id)]);
 
-    // Sync to Cloud Vercel Backend
-    if (settings.storageProvider === 'GOOGLE' || settings.googleSpreadsheetUrl) {
-      cloudApiService.syncAttendance(newRecord, settings.googleSpreadsheetUrl, settings.googleDriveFolderUrl);
-    }
+    // Sync to Cloud Vercel Backend & Google Drive/Sheets
+    cloudApiService.syncAttendance(
+      newRecord,
+      settings?.googleSpreadsheetUrl,
+      settings?.googleDriveFolderUrl,
+      settings?.gasWebhookUrl
+    );
 
     triggerSuccessAnimation();
     showToast(`Presensi ${isShift ? shiftLabel : ''} Pulang Berhasil! Durasi: ${duration.formatted}`, 'success');
@@ -403,9 +409,12 @@ export function AttendanceProvider({ children }) {
     const updated = storageService.addAttendance(newRecord);
     setRecords([newRecord, ...records.filter(r => r.id !== newRecord.id)]);
 
-    if (settings.storageProvider === 'GOOGLE' || settings.googleSpreadsheetUrl) {
-      cloudApiService.syncAttendance(newRecord, settings.googleSpreadsheetUrl, settings.googleDriveFolderUrl);
-    }
+    cloudApiService.syncAttendance(
+      newRecord,
+      settings?.googleSpreadsheetUrl,
+      settings?.googleDriveFolderUrl,
+      settings?.gasWebhookUrl
+    );
 
     triggerSuccessAnimation();
     showToast(`Pengajuan ${type} Berhasil Terkirim & Tersimpan!`, 'success');

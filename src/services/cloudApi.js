@@ -62,34 +62,42 @@ export const cloudApiService = {
   },
 
   /**
-   * Mengirim presensi pegawai ke Cloud (Google Sheets & Drive)
+   * Mengirim presensi pegawai ke Cloud (Google Sheets, Drive Storage, dan Vercel Postgres)
    */
   async syncAttendance(record, spreadsheetUrl = '', folderUrl = '', webhookUrl = '') {
+    const activeSettings = (typeof window !== 'undefined' && window.localStorage)
+      ? JSON.parse(window.localStorage.getItem('si_absen_settings') || '{}')
+      : {};
+
+    const effectiveSpreadsheetUrl = spreadsheetUrl || activeSettings.googleSpreadsheetUrl || '';
+    const effectiveFolderUrl = folderUrl || activeSettings.googleDriveFolderUrl || '';
+    const effectiveWebhookUrl = webhookUrl || activeSettings.gasWebhookUrl || '';
+
     const action = record.type?.toLowerCase().includes('pulang') ? 'SUBMIT_PULANG' : 'SUBMIT_MASUK';
     const payload = {
       action,
-      spreadsheetUrl,
-      spreadsheetId: this.extractSpreadsheetId(spreadsheetUrl),
-      folderUrl,
-      folderId: this.extractFolderId(folderUrl),
+      spreadsheetUrl: effectiveSpreadsheetUrl,
+      spreadsheetId: this.extractSpreadsheetId(effectiveSpreadsheetUrl),
+      folderUrl: effectiveFolderUrl,
+      folderId: this.extractFolderId(effectiveFolderUrl),
       data: record
     };
 
-    // 1. Direct Webhook sync
-    if (webhookUrl) {
+    // 1. Direct Webhook sync ke Google Apps Script (Untuk simpan foto bukti ke Google Drive & rekap ke Sheets)
+    if (effectiveWebhookUrl) {
       try {
-        await fetch(webhookUrl, {
+        await fetch(effectiveWebhookUrl, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
       } catch (e) {
-        console.warn('Direct webhook sync attendance:', e);
+        console.warn('Direct webhook sync attendance to Google Apps Script error:', e);
       }
     }
 
-    // 2. Vercel Serverless Sync
+    // 2. Vercel Serverless Sync ke Postgres Database
     try {
       await fetch('/api/sync', {
         method: 'POST',
@@ -97,7 +105,7 @@ export const cloudApiService = {
         body: JSON.stringify(payload)
       });
     } catch (e) {
-      console.warn('Vercel serverless attendance sync:', e);
+      console.warn('Vercel serverless attendance sync error:', e);
     }
 
     return { success: true };

@@ -151,7 +151,7 @@ export function AuthProvider({ children }) {
     return { success: true, user: userWithLogin };
   };
 
-  const register = async ({ name, email, password, nip, skpd }) => {
+  const register = async ({ name, email, password, nip, skpd, photo }) => {
     // Refresh latest users from cloud first
     await refreshUsersFromCloud();
 
@@ -178,7 +178,7 @@ export function AuthProvider({ children }) {
 
     const existsEmail = allUsers.some(u => u.email?.toLowerCase().trim() === emailClean);
     if (existsEmail) {
-      return { success: false, message: 'Email sudah terdaftar dalam sistem.' };
+      return { success: false, message: 'Email sudah terdaftar oleh pegawai lain.' };
     }
 
     if (!skpd?.trim()) {
@@ -196,7 +196,7 @@ export function AuthProvider({ children }) {
       role: 'pegawai',
       nip: nipClean,
       skpd: skpd.trim(),
-      photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+      photo: photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
     };
 
     const saved = storageService.addUser(newUser);

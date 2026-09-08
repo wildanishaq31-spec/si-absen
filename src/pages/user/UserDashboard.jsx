@@ -10,6 +10,7 @@ import { FaceCameraModal } from '../../components/camera/FaceCameraModal';
 import { LeaveRequestModal } from './LeaveRequestModal';
 import { UserHistoryPage } from './UserHistoryPage';
 import { MonitoringKedisiplinanModal } from './MonitoringKedisiplinanModal';
+import { UpdatePhotoModal } from '../../components/user/UpdatePhotoModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAttendance } from '../../contexts/AttendanceContext';
 import { useGeolocation } from '../../hooks/useGeolocation';
@@ -25,6 +26,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
   // Modals & Drawer state
   const [showSidebarDrawer, setShowSidebarDrawer] = useState(false);
   const [showMonitoringModal, setShowMonitoringModal] = useState(false);
+  const [showUpdatePhotoModal, setShowUpdatePhotoModal] = useState(false);
   const [showPresensiMenu, setShowPresensiMenu] = useState(false);
   const [showFaceCamera, setShowFaceCamera] = useState(false);
   const [cameraMode, setCameraMode] = useState('MASUK'); // 'MASUK' or 'PULANG'
@@ -91,6 +93,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
         onClose={() => setShowSidebarDrawer(false)}
         onLogout={onLogout}
         onOpenMonitoring={() => setShowMonitoringModal(true)}
+        onOpenUpdatePhoto={() => setShowUpdatePhotoModal(true)}
       />
 
       {/* Horizontal Sliding Page Transition (Beranda <-> Riwayat Presensi) */}
@@ -110,12 +113,25 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
           <main className="mobile-content">
             {/* 1. Profile Card Matching SIPP Screenshot */}
             <div className="profile-card">
-              <div className="avatar-wrapper">
-                <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
-                  <circle cx="50" cy="50" r="48" fill="#F1F5F9" stroke="#00ACC1" strokeWidth="3" />
-                  <circle cx="50" cy="40" r="18" fill="#94A3B8" />
-                  <path d="M 22 84 A 30 28 0 0 1 78 84 Z" fill="#94A3B8" />
-                </svg>
+              <div 
+                className="avatar-wrapper"
+                onClick={() => setShowUpdatePhotoModal(true)}
+                style={{ cursor: 'pointer', overflow: 'hidden' }}
+                title="Klik untuk ubah foto profil"
+              >
+                {currentUser?.photo ? (
+                  <img 
+                    src={currentUser.photo} 
+                    alt={currentUser.name} 
+                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                  />
+                ) : (
+                  <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
+                    <circle cx="50" cy="50" r="48" fill="#F1F5F9" stroke="#00ACC1" strokeWidth="3" />
+                    <circle cx="50" cy="40" r="18" fill="#94A3B8" />
+                    <path d="M 22 84 A 30 28 0 0 1 78 84 Z" fill="#94A3B8" />
+                  </svg>
+                )}
                 <span className="online-dot" />
               </div>
 
@@ -247,6 +263,12 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
         isOpen={showLeaveModal}
         onClose={() => setShowLeaveModal(false)}
         initialType={leaveInitialType}
+      />
+
+      {/* Update Photo Profile Modal */}
+      <UpdatePhotoModal 
+        isOpen={showUpdatePhotoModal}
+        onClose={() => setShowUpdatePhotoModal(false)}
       />
     </div>
   );

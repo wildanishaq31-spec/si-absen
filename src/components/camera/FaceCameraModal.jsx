@@ -423,9 +423,11 @@ export function FaceCameraModal({
         {/* Top Handle Indicator */}
         <div style={{ width: '40px', height: '4px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px' }} />
 
-        {/* Circular Avatar with Blue & Red Circle Frame matching SIPP */}
+        {/* Profile Avatar Circle in Bottom Card (Matching Screenshot 2) */}
         <div 
           style={{
+            position: 'absolute',
+            top: '-42px',
             width: '84px',
             height: '84px',
             borderRadius: '50%',
@@ -434,47 +436,30 @@ export function FaceCameraModal({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-            position: 'relative'
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)'
           }}
         >
-          {/* Red circular badge background */}
           <div 
             style={{
-              width: '72px',
-              height: '72px',
+              width: '74px',
+              height: '74px',
               borderRadius: '50%',
-              backgroundColor: '#DE3636',
+              backgroundColor: '#1E293B',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden'
             }}
           >
-            {/* ASN Illustration Cartoon Avatar */}
-            <svg viewBox="0 0 100 100" width="100%" height="100%">
-              {/* Head / Face */}
-              <circle cx="50" cy="42" r="22" fill="#FCD34D" />
-              {/* Hair */}
-              <path d="M28,38 C28,24 40,16 52,16 C66,16 74,24 74,38 C70,30 60,26 48,26 C36,26 30,32 28,38 Z" fill="#3E2723" />
-              {/* Winking Left Eye */}
-              <path d="M38,42 Q43,36 48,42" stroke="#1F2937" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-              {/* Right Open Eye */}
-              <circle cx="58" cy="41" r="3" fill="#1F2937" />
-              <circle cx="59" cy="40" r="1" fill="#FFFFFF" />
-              {/* Nose */}
-              <path d="M50,44 L48,48 L52,48" stroke="#D97706" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-              {/* Confident Smile */}
-              <path d="M44,52 Q50,57 56,52" stroke="#B45309" strokeWidth="2" fill="none" strokeLinecap="round" />
-              {/* PNS / ASN Uniform (Khaki Tan Brown) */}
-              <path d="M22,95 L22,78 C22,68 34,64 50,64 C66,64 78,68 78,78 L78,95 Z" fill="#A87948" />
-              {/* Uniform Collar */}
-              <path d="M42,64 L50,76 L58,64" fill="#FFFFFF" />
-              <path d="M36,64 L50,78 L64,64" fill="#8C6239" />
-              {/* Badge pin / Buttons */}
-              <circle cx="50" cy="84" r="2" fill="#FBBF24" />
-              <rect x="30" y="74" width="8" height="4" rx="1" fill="#FBBF24" />
-            </svg>
+            {currentUser?.photo ? (
+              <img 
+                src={currentUser.photo} 
+                alt={employeeName} 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+              />
+            ) : (
+              <User size={38} color="#94A3B8" />
+            )}
           </div>
         </div>
 

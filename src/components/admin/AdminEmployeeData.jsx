@@ -1,18 +1,23 @@
-import React, { useState } from 'react';
-import { Pencil, Trash2, UserPlus, Check, X, Shield, Key, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Pencil, Trash2, UserPlus, Check, X, Shield, Key, Eye, EyeOff, CheckCircle2, XCircle, Camera, Image as ImageIcon, Folder, UserCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAttendance } from '../../contexts/AttendanceContext';
 import { formatAutoUppercase, formatAutoUnitKerja, formatAutoLowercase } from '../../utils/formatters';
+import { processProfileImage, getProfileDrivePath } from '../../utils/imageUtils';
 
 export function AdminEmployeeData() {
   const { users, register, updateUser, deleteUser, currentUser } = useAuth();
-  const { showConfirm, showSuccess, showToast } = useAttendance();
+  const { showConfirm, showSuccess, showToast, settings } = useAttendance();
   const [isEditing, setIsEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [isCreating, setIsCreating] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: '', email: '', nip: '', skpd: '', password: '' });
+  const [createForm, setCreateForm] = useState({ name: '', email: '', nip: '', skpd: '', password: '', photo: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+
+  const createPhotoInputRef = useRef(null);
+  const editPhotoInputRef = useRef(null);
 
   // Hanya tampilkan data pegawai
   const employeeUsers = users.filter(u => u.role === 'pegawai');
@@ -37,6 +42,38 @@ export function AdminEmployeeData() {
     setErrorMsg('');
   };
 
+  const handleEditPhotoChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsProcessingPhoto(true);
+    try {
+      const base64 = await processProfileImage(file, 360, 0.88);
+      setEditForm(prev => ({ ...prev, photo: base64 }));
+      showToast('Foto profil siap disimpan!', 'success');
+    } catch (err) {
+      setErrorMsg('Gagal memproses foto: ' + err.message);
+    } finally {
+      setIsProcessingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleCreatePhotoChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsProcessingPhoto(true);
+    try {
+      const base64 = await processProfileImage(file, 360, 0.88);
+      setCreateForm(prev => ({ ...prev, photo: base64 }));
+      showToast('Foto profil berhasil diunggah!', 'success');
+    } catch (err) {
+      setErrorMsg('Gagal memproses foto: ' + err.message);
+    } finally {
+      setIsProcessingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
   const handleSaveEdit = async (userId) => {
     // Validate NIP doesn't belong to someone else
     const nipExists = users.some(u => u.nip === editForm.nip && u.id !== userId);
@@ -55,7 +92,7 @@ export function AdminEmployeeData() {
     await updateUser(userId, editForm);
     setIsEditing(null);
     setErrorMsg('');
-    showSuccess(`Data pegawai ${editForm.name} berhasil diperbarui!`);
+    showSuccess(`Data & foto pegawai ${editForm.name} berhasil diperbarui!`);
   };
 
   const handleDelete = (userId, name) => {
@@ -87,9 +124,9 @@ export function AdminEmployeeData() {
     } else {
       const newName = createForm.name;
       setIsCreating(false);
-      setCreateForm({ name: '', email: '', nip: '', skpd: '', password: '' });
+      setCreateForm({ name: '', email: '', nip: '', skpd: '', password: '', photo: '' });
       setShowPassword(false);
-      showSuccess(`Akun pegawai ${newName} berhasil didaftarkan!`);
+      showSuccess(`Akun pegawai ${newName} beserta foto profil berhasil didaftarkan!`);
     }
   };
 
@@ -122,6 +159,66 @@ export function AdminEmployeeData() {
         <div className="table-card" style={{ padding: '20px', background: '#F8FAFC', border: '1px solid #CBD5E1' }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem', color: '#00838F' }}>Daftarkan Pegawai Baru</h3>
           <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            
+            {/* Foto Profil Upload Section */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px 16px', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+              <div 
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  border: '2px solid #00ACC1',
+                  backgroundColor: '#F1F5F9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
+                {createForm.photo ? (
+                  <img src={createForm.photo} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <UserCircle size={52} color="#94A3B8" />
+                )}
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B' }}>Foto Profil Pegawai</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '6px' }}>
+                  Format JPG/PNG. Otomatis disimpan di: <strong>Google Drive ➔ Profil Pegawai</strong>
+                </div>
+                <input 
+                  type="file" 
+                  ref={createPhotoInputRef} 
+                  accept="image/*" 
+                  style={{ display: 'none' }} 
+                  onChange={handleCreatePhotoChange} 
+                />
+                <button
+                  type="button"
+                  onClick={() => createPhotoInputRef.current?.click()}
+                  disabled={isProcessingPhoto}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #00838F',
+                    backgroundColor: '#E0F7FA',
+                    color: '#006064',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Camera size={14} />
+                  <span>{createForm.photo ? 'Ganti Foto' : 'Upload Foto Profil'}</span>
+                </button>
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>Nama Lengkap</label>
@@ -161,7 +258,7 @@ export function AdminEmployeeData() {
               </div>
             </div>
 
-            {/* 3-Segment Password Strength Indicator Bar & Validation Checklist (Muncul jika kata sandi diisi/diketik) */}
+            {/* 3-Segment Password Strength Indicator Bar & Validation Checklist */}
             {password.length > 0 && (
               <div className="smooth-fade-in" style={{ backgroundColor: '#FFFFFF', padding: '12px 14px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', maxWidth: '300px' }}>
@@ -242,6 +339,44 @@ export function AdminEmployeeData() {
                   {isEditing === user.id ? (
                     <>
                       <td>
+                        {/* Edit Photo Avatar Uploader */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                          <div style={{ width: '42px', height: '42px', borderRadius: '50%', overflow: 'hidden', border: '2px solid #00ACC1', flexShrink: 0, backgroundColor: '#F1F5F9' }}>
+                            {editForm.photo ? (
+                              <img src={editForm.photo} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <UserCircle size={42} color="#94A3B8" />
+                            )}
+                          </div>
+                          <input 
+                            type="file" 
+                            ref={editPhotoInputRef} 
+                            accept="image/*" 
+                            style={{ display: 'none' }} 
+                            onChange={handleEditPhotoChange} 
+                          />
+                          <button
+                            type="button"
+                            onClick={() => editPhotoInputRef.current?.click()}
+                            disabled={isProcessingPhoto}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid #00838F',
+                              backgroundColor: '#E0F7FA',
+                              color: '#006064',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Camera size={12} />
+                            <span>Ganti Foto</span>
+                          </button>
+                        </div>
                         <input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: formatAutoUppercase(e.target.value)})} style={{ width: '100%', marginBottom: '4px', padding: '6px', borderRadius: '4px', border: '1px solid #CBD5E1', textTransform: 'uppercase' }} />
                         <input type="text" value={editForm.nip} onChange={e => setEditForm({...editForm, nip: e.target.value.replace(/[^0-9]/g, '')})} style={{ width: '100%', padding: '6px', borderRadius: '4px', border: '1px solid #CBD5E1' }} placeholder="NIP" />
                       </td>
@@ -268,8 +403,19 @@ export function AdminEmployeeData() {
                   ) : (
                     <>
                       <td>
-                        <div style={{ fontWeight: 700, color: '#1E293B' }}>{user.name}</div>
-                        <div style={{ fontSize: '0.78rem', color: '#64748B' }}>{user.nip}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '42px', height: '42px', borderRadius: '50%', overflow: 'hidden', border: '2px solid #E2E8F0', flexShrink: 0, backgroundColor: '#E0F2F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {user.photo ? (
+                              <img src={user.photo} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <UserCircle size={42} color="#94A3B8" />
+                            )}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#1E293B' }}>{user.name}</div>
+                            <div style={{ fontSize: '0.78rem', color: '#64748B' }}>{user.nip}</div>
+                          </div>
+                        </div>
                       </td>
                       <td style={{ fontSize: '0.85rem' }}>{user.skpd}</td>
                       <td style={{ fontSize: '0.85rem' }}>{user.email}</td>
@@ -280,10 +426,10 @@ export function AdminEmployeeData() {
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                          <button onClick={() => handleEditClick(user)} style={{ background: '#F1F5F9', color: '#00838F', border: '1px solid #CBD5E1', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}>
+                          <button onClick={() => handleEditClick(user)} style={{ background: '#F1F5F9', color: '#00838F', border: '1px solid #CBD5E1', padding: '6px', borderRadius: '6px', cursor: 'pointer' }} title="Edit Data & Foto Pegawai">
                             <Pencil size={14} />
                           </button>
-                          <button onClick={() => handleDelete(user.id, user.name)} style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}>
+                          <button onClick={() => handleDelete(user.id, user.name)} style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '6px', borderRadius: '6px', cursor: 'pointer' }} title="Hapus Akun Pegawai">
                             <Trash2 size={14} />
                           </button>
                         </div>

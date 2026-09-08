@@ -6,9 +6,7 @@ import { neon } from '@neondatabase/serverless';
 // In-memory fallback (when POSTGRES_URL is not yet connected)
 let memorySettings = {
   storageProvider: 'GOOGLE',
-  googleSpreadsheetUrl: '',
   googleDriveFolderUrl: '',
-  gasWebhookUrl: '',
   skpdName: 'UPTD Puskesmas Cermee'
 };
 

@@ -76,7 +76,7 @@ export function AdminForceSetupModal({ isOpen }) {
       if (res.success) {
         if (triggerSuccessAnimation) triggerSuccessAnimation();
         if (showToast) {
-          showToast('🎉 Akun Administrator berhasil diamankan & dienkripsi! Kredensial telah disinkronkan ke Google Spreadsheet.', 'success');
+          showToast('🎉 Akun Administrator berhasil diamankan & dienkripsi! Kredensial telah disinkronkan ke Vercel Postgres.', 'success');
         }
       } else {
         setErrorMsg(res.message || 'Gagal memperbarui data akun.');

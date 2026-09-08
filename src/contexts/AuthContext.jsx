@@ -11,9 +11,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
 
   const refreshUsersFromCloud = useCallback(async () => {
-    const settings = storageService.getSettings();
     try {
-      const cloudData = await cloudApiService.fetchAllData(settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
+      const cloudData = await cloudApiService.fetchAllData();
       if (cloudData && Array.isArray(cloudData.users)) {
         // Authoritative server users list: Server + Default Admin
         let mergedUsers = [...cloudData.users];
@@ -43,7 +42,7 @@ export function AuthProvider({ children }) {
         }
       }
     } catch (err) {
-      console.warn('Gagal sinkronisasi data user dari Cloud Backend:', err);
+      console.warn('Gagal sinkronisasi data user dari Vercel Postgres:', err);
     }
   }, []);
 
@@ -71,13 +70,12 @@ export function AuthProvider({ children }) {
   }, [refreshUsersFromCloud]);
 
   const resetLocalAndCloudData = async () => {
-    const settings = storageService.getSettings();
     try {
-      // 1. Reset cloud serverless & Google Spreadsheet
-      await cloudApiService.resetCentralDatabase(settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
+      // 1. Reset Vercel Postgres database
+      await cloudApiService.resetCentralDatabase();
       
-      // 2. Overwrite Superadmin row in Google Sheets back to default admin
-      await cloudApiService.syncUser(INITIAL_USERS[0], settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
+      // 2. Overwrite Superadmin in Vercel Postgres back to default admin
+      await cloudApiService.syncUser(INITIAL_USERS[0]);
     } catch (e) {
       console.warn('Backend reset warning:', e);
     }
@@ -90,7 +88,7 @@ export function AuthProvider({ children }) {
   };
 
   const login = async (identifier, password, requiredRole = null) => {
-    // 1. Refresh latest users from cloud/database first to enforce authoritative check
+    // 1. Refresh latest users from Vercel Postgres first to enforce authoritative check
     await refreshUsersFromCloud();
 
     const allUsers = storageService.getUsers();
@@ -147,9 +145,8 @@ export function AuthProvider({ children }) {
     setCurrentUser(userWithLogin);
     storageService.saveSession(userWithLogin);
 
-    // Sync updated lastLogin to Google Spreadsheet tab Superadmin or Data Pegawai
-    const settings = storageService.getSettings();
-    cloudApiService.syncUser(userWithLogin, settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
+    // Sync updated lastLogin to Vercel Postgres
+    cloudApiService.syncUser(userWithLogin);
 
     return { success: true, user: userWithLogin };
   };
@@ -210,9 +207,8 @@ export function AuthProvider({ children }) {
     setCurrentUser(saved);
     storageService.saveSession(saved);
 
-    // Sync directly to Google Spreadsheet & Cloud Backend
-    const settings = storageService.getSettings();
-    await cloudApiService.syncUser(saved, settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
+    // Sync directly to Vercel Postgres Database
+    await cloudApiService.syncUser(saved);
 
     return { success: true, user: saved };
   };
@@ -240,9 +236,8 @@ export function AuthProvider({ children }) {
         storageService.saveSession(updatedUser);
       }
 
-      // Sync updated admin/pegawai to Google Spreadsheet (tab Superadmin or Data Pegawai)
-      const settings = storageService.getSettings();
-      cloudApiService.syncUser(updatedUser, settings?.googleSpreadsheetUrl, settings?.gasWebhookUrl);
+      // Sync updated admin/pegawai to Vercel Postgres Database
+      cloudApiService.syncUser(updatedUser);
 
       return { success: true, user: updatedUser };
     }

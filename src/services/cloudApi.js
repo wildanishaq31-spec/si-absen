@@ -1,16 +1,7 @@
 // Cloud API Service for SI-ABSEN
-// Supports Vercel Serverless Backend and Direct Cloud Sync to Google Spreadsheet & Drive
+// Powered by Vercel Serverless API (/api/sync) and Vercel Postgres (Neon)
 
 export const cloudApiService = {
-  /**
-   * Ekstrak ID dari Google Spreadsheet URL
-   */
-  extractSpreadsheetId(urlOrId) {
-    if (!urlOrId) return '';
-    const match = urlOrId.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    return match ? match[1] : urlOrId.trim();
-  },
-
   /**
    * Ekstrak ID dari Google Drive Folder URL
    */
@@ -23,17 +14,14 @@ export const cloudApiService = {
   /**
    * Menguji koneksi Vercel Postgres Database & Google Drive Storage
    */
-  async testGoogleIntegration(spreadsheetUrl = '', folderUrl = '', webhookUrl = '') {
+  async testGoogleIntegration(folderUrl = '') {
     const payload = {
       action: 'TEST_POSTGRES',
-      spreadsheetUrl,
-      spreadsheetId: this.extractSpreadsheetId(spreadsheetUrl),
       folderUrl,
       folderId: this.extractFolderId(folderUrl),
       timestamp: new Date().toISOString()
     };
 
-    // 1. Vercel Backend Serverless & PostgreSQL Test
     try {
       const res = await fetch('/api/sync', {
         method: 'POST',
@@ -52,58 +40,36 @@ export const cloudApiService = {
         };
       }
     } catch (err) {
-      console.warn('Vercel API fallback:', err);
+      console.warn('Vercel API connection error:', err);
     }
 
     return {
       success: true,
-      message: 'Koneksi Cloud Storage & Database tervalidasi dan siap digunakan.'
+      message: 'Koneksi Cloud Storage & Database Vercel Postgres siap digunakan.'
     };
   },
 
   /**
-   * Mengirim presensi pegawai ke Cloud (Google Sheets, Drive Storage, dan Vercel Postgres)
+   * Mengirim presensi pegawai ke Database Cloud Vercel Postgres
    */
-  async syncAttendance(record, spreadsheetUrl = '', folderUrl = '', webhookUrl = '') {
-    const activeSettings = (typeof window !== 'undefined' && window.localStorage)
-      ? JSON.parse(window.localStorage.getItem('si_absen_settings') || '{}')
-      : {};
-
-    const effectiveSpreadsheetUrl = spreadsheetUrl || activeSettings.googleSpreadsheetUrl || '';
-    const effectiveFolderUrl = folderUrl || activeSettings.googleDriveFolderUrl || '';
-    const effectiveWebhookUrl = webhookUrl || activeSettings.gasWebhookUrl || '';
-
+  async syncAttendance(record, folderUrl = '') {
     const action = record.type?.toLowerCase().includes('pulang') ? 'SUBMIT_PULANG' : 'SUBMIT_MASUK';
     const payload = {
       action,
-      spreadsheetUrl: effectiveSpreadsheetUrl,
-      spreadsheetId: this.extractSpreadsheetId(effectiveSpreadsheetUrl),
-      folderUrl: effectiveFolderUrl,
-      folderId: this.extractFolderId(effectiveFolderUrl),
+      folderUrl,
+      folderId: this.extractFolderId(folderUrl),
       data: record
     };
 
-    // 1. Direct Webhook sync ke Google Apps Script (Untuk simpan foto bukti ke Google Drive & rekap ke Sheets)
-    if (effectiveWebhookUrl) {
-      try {
-        await fetch(effectiveWebhookUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        });
-      } catch (e) {
-        console.warn('Direct webhook sync attendance to Google Apps Script error:', e);
-      }
-    }
-
-    // 2. Vercel Serverless Sync ke Postgres Database
     try {
-      await fetch('/api/sync', {
+      const res = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      if (res.ok) {
+        return await res.json();
+      }
     } catch (e) {
       console.warn('Vercel serverless attendance sync error:', e);
     }
@@ -112,87 +78,42 @@ export const cloudApiService = {
   },
 
   /**
-   * Mendaftarkan atau memperbarui data Admin / Pegawai ke Google Spreadsheet
+   * Mendaftarkan atau memperbarui data Admin / Pegawai ke Database Vercel Postgres
    */
-  async syncUser(user, spreadsheetUrl = '', webhookUrl = '') {
+  async syncUser(user) {
     const isAdmin = user.role === 'admin';
     const action = isAdmin ? 'UPDATE_ADMIN' : 'REGISTER_PEGAWAI';
 
-    // Format data: Akun Superadmin tidak memiliki kolom NIP dan SKPD (hanya ID_ADMIN, NAMA_LENGKAP, EMAIL, PASSWORD, ROLE, TERAKHIR_LOGIN)
-    let formattedData;
-    if (isAdmin) {
-      formattedData = {
-        id: user.id || 'U-ADMIN-01',
-        name: user.name,
-        email: user.email,
-        password: user.password,
-        role: 'admin',
-        lastLogin: new Date().toISOString(),
-        columns: ['ID_ADMIN', 'NAMA_LENGKAP', 'EMAIL', 'PASSWORD', 'ROLE', 'TERAKHIR_LOGIN']
-      };
-    } else {
-      formattedData = {
-        ...user,
-        role: 'pegawai',
-        columns: ['ID_PEGAWAI', 'NAMA_LENGKAP', 'EMAIL', 'PASSWORD', 'NIP', 'SKPD', 'ROLE', 'TANGGAL_DAFTAR']
-      };
-    }
-
     const payload = {
       action,
-      spreadsheetUrl,
-      spreadsheetId: this.extractSpreadsheetId(spreadsheetUrl),
-      data: formattedData
+      data: user
     };
 
-    // 1. Direct Webhook sync ke Google Sheets (tab Superadmin atau Data Pegawai)
-    if (webhookUrl) {
-      try {
-        await fetch(webhookUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        });
-      } catch (e) {
-        console.warn('Direct webhook sync user:', e);
-      }
-    }
-
-    // 2. Vercel Serverless Sync
     try {
-      await fetch('/api/sync', {
+      const res = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      if (res.ok) {
+        return await res.json();
+      }
     } catch (e) {
-      console.warn('Vercel serverless user sync:', e);
+      console.warn('Vercel serverless user sync error:', e);
     }
 
     return { success: true };
   },
 
   /**
-   * Mengambil data terpusat dari Cloud Google
+   * Mengambil seluruh data terpusat (Users & Attendance) dari Vercel Postgres
    */
-  async fetchAllData(spreadsheetUrl = '', webhookUrl = '') {
-    if (webhookUrl) {
-      try {
-        const spId = this.extractSpreadsheetId(spreadsheetUrl);
-        const urlWithParam = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}action=GET_ALL_DATA&spreadsheetId=${encodeURIComponent(spId)}`;
-        const res = await fetch(urlWithParam);
-        if (res.ok) {
-          return await res.json();
-        }
-      } catch (err) {
-        console.warn('Fetch all data from webhook error:', err);
-      }
-    }
-
+  async fetchAllData() {
     try {
-      const res = await fetch(`/api/sync?action=GET_ALL_DATA&spId=${this.extractSpreadsheetId(spreadsheetUrl)}`);
-      if (res.ok) return await res.json();
+      const res = await fetch('/api/sync?action=GET_ALL_DATA');
+      if (res.ok) {
+        return await res.json();
+      }
     } catch (err) {
       console.warn('Fetch all data from vercel error:', err);
     }
@@ -200,7 +121,7 @@ export const cloudApiService = {
   },
 
   /**
-   * Mengambil pengaturan terpusat (Spreadsheet URL, Webhook, SKPD) dari serverless backend
+   * Mengambil pengaturan terpusat (SKPD, Kunci Lokasi, Folder Drive) dari Vercel Postgres
    */
   async fetchCentralSettings() {
     try {
@@ -216,7 +137,7 @@ export const cloudApiService = {
   },
 
   /**
-   * Menyimpan pengaturan terpusat ke serverless backend
+   * Menyimpan pengaturan terpusat ke Vercel Postgres
    */
   async saveCentralSettings(settings) {
     try {
@@ -233,33 +154,14 @@ export const cloudApiService = {
   },
 
   /**
-   * Me-reset database terpusat di serverless backend & spreadsheet webhook
+   * Me-reset database terpusat di Vercel Postgres
    */
-  async resetCentralDatabase(spreadsheetUrl = '', webhookUrl = '') {
-    const payload = {
-      action: 'RESET_DATABASE',
-      spreadsheetUrl,
-      spreadsheetId: this.extractSpreadsheetId(spreadsheetUrl)
-    };
-
-    if (webhookUrl) {
-      try {
-        await fetch(webhookUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        });
-      } catch (e) {
-        console.warn('Webhook reset database:', e);
-      }
-    }
-
+  async resetCentralDatabase() {
     try {
       const res = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ action: 'RESET_DATABASE' })
       });
       if (res.ok) return await res.json();
     } catch (err) {

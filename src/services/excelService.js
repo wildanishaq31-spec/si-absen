@@ -7,7 +7,7 @@ const MONTH_NAMES = [
 ];
 
 /**
- * Generates and downloads a multi-tab Excel (.xlsx) file matching the Google Spreadsheet format
+ * Generates and downloads a multi-tab Excel (.xlsx) file for complete attendance recaps
  * Supports category separation: 'HARIAN' vs 'SHIFT'
  */
 export function exportAttendanceExcel(users, attendanceRecords, year = 2026, monthIndex = 8, category = 'HARIAN') {

@@ -22,10 +22,9 @@ export const INITIAL_USERS = [
 // Clean Attendance: Completely Empty []
 export const INITIAL_ATTENDANCE = [];
 
-// Settings with Dual Storage Configuration (Google Cloud via Vercel Serverless vs Dedicated RustFS Server)
+// Settings with Dual Storage Configuration (Vercel Postgres & Google Drive Storage vs Dedicated RustFS Server)
 export const INITIAL_SETTINGS = {
-  storageProvider: 'GOOGLE', // 'GOOGLE' (Google Sheets & Drive via Vercel API) vs 'SERVER' (Dedicated RustFS Storage Server)
-  googleSpreadsheetUrl: '', // Link Google Spreadsheet (https://docs.google.com/spreadsheets/d/...)
+  storageProvider: 'GOOGLE', // 'GOOGLE' (Vercel Postgres & Google Drive) vs 'SERVER' (Dedicated RustFS Storage Server)
   googleDriveFolderUrl: '', // Link Folder Google Drive (https://drive.google.com/drive/folders/...)
   
   rustfsEndpoint: '', // URL Endpoint Server RustFS (contoh: https://rustfs.pkmcermee.my.id)

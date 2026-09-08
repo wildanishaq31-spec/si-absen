@@ -76,7 +76,7 @@ export function AdminProfileModal({ isOpen, onClose }) {
       setIsSubmitting(false);
 
       if (res.success) {
-        setSuccessMsg('Profil Administrator berhasil disimpan & disinkronkan ke Google Spreadsheet!');
+        setSuccessMsg('Profil Administrator berhasil disimpan & disinkronkan ke Vercel Postgres!');
         if (showSuccess) {
           showSuccess('Profil Administrator berhasil diperbarui!');
         }

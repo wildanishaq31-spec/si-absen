@@ -159,7 +159,7 @@ export function SidebarDrawer({ isOpen, onClose, onLogout, onOpenMonitoring, onO
           <div 
             className="drawer-menu-item"
             onClick={() => handleClose(() => {
-              showSuccess('Seluruh riwayat absensi tersinkronisasi realtime dengan Google Drive & Spreadsheet.', 'BACKUP DATA SUKSES');
+              showSuccess('Seluruh riwayat absensi tersinkronisasi realtime dengan Vercel Postgres & Google Drive.', 'BACKUP DATA SUKSES');
             })}
           >
             <div className="drawer-icon-box bg-purple">

@@ -86,11 +86,9 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
 
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Dual Storage Mode: 'GOOGLE' (Google Sheets & Drive via Vercel Backend) vs 'SERVER' (Dedicated RustFS Storage Server)
+  // Dual Storage Mode: 'GOOGLE' (Vercel Postgres & Google Drive) vs 'SERVER' (Dedicated RustFS Storage Server)
   const [storageProviderInput, setStorageProviderInput] = useState(settings?.storageProvider || 'GOOGLE');
-  const [googleSpreadsheetUrlInput, setGoogleSpreadsheetUrlInput] = useState(settings?.googleSpreadsheetUrl || '');
   const [googleDriveFolderUrlInput, setGoogleDriveFolderUrlInput] = useState(settings?.googleDriveFolderUrl || '');
-  const [gasWebhookUrlInput, setGasWebhookUrlInput] = useState(settings?.gasWebhookUrl || '');
   const [testingGoogleCloud, setTestingGoogleCloud] = useState(false);
 
   const [rustfsEndpointInput, setRustfsEndpointInput] = useState(settings?.rustfsEndpoint || '');
@@ -194,8 +192,8 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
         };
       case 'SETTINGS':
         return {
-          title: 'Pengaturan API, Kunci Lokasi & RustFS',
-          subtitle: 'Konfigurasi Google Maps radius lock, RustFS Cloud Storage, dan Google Spreadsheet'
+          title: 'Pengaturan API, Kunci Lokasi & Cloud Storage',
+          subtitle: 'Konfigurasi Google Maps radius lock, Vercel Postgres, Google Drive & RustFS'
         };
       default:
         return {
@@ -1290,7 +1288,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
           <AdminEmployeeData />
         )}
 
-        {/* TAB 7: SETTINGS GOOGLE MAPS GPS LOCK & GOOGLE APPS SCRIPT WEBHOOK */}
+        {/* TAB 7: SETTINGS GOOGLE MAPS GPS LOCK & VERCEL POSTGRES / GOOGLE DRIVE */}
         {activeTab === 'SETTINGS' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
             

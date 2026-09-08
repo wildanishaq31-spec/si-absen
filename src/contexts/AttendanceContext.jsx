@@ -17,25 +17,22 @@ export function AttendanceProvider({ children }) {
   const [toast, setToast] = useState(null);
 
   const refreshAttendanceFromCloud = useCallback(async () => {
-    const currentSettings = storageService.getSettings();
-    if (currentSettings?.storageProvider === 'GOOGLE' && currentSettings?.googleSpreadsheetUrl) {
-      try {
-        const cloudData = await cloudApiService.fetchAllData(currentSettings.googleSpreadsheetUrl);
-        if (cloudData && Array.isArray(cloudData.attendance) && cloudData.attendance.length > 0) {
-          const localRecords = storageService.getAttendance();
-          const mergedMap = new Map();
-          localRecords.forEach(r => mergedMap.set(r.compositeKey || r.id, r));
-          cloudData.attendance.forEach(cr => {
-            const key = cr.compositeKey || cr.id;
-            mergedMap.set(key, { ...cr });
-          });
-          const mergedList = Array.from(mergedMap.values());
-          storageService.saveAttendance(mergedList);
-          setRecords(mergedList);
-        }
-      } catch (err) {
-        console.warn('Gagal sinkronisasi data presensi dari Cloud Backend:', err);
+    try {
+      const cloudData = await cloudApiService.fetchAllData();
+      if (cloudData && Array.isArray(cloudData.attendance) && cloudData.attendance.length > 0) {
+        const localRecords = storageService.getAttendance();
+        const mergedMap = new Map();
+        localRecords.forEach(r => mergedMap.set(r.compositeKey || r.id, r));
+        cloudData.attendance.forEach(cr => {
+          const key = cr.compositeKey || cr.id;
+          mergedMap.set(key, { ...cr });
+        });
+        const mergedList = Array.from(mergedMap.values());
+        storageService.saveAttendance(mergedList);
+        setRecords(mergedList);
       }
+    } catch (err) {
+      console.warn('Gagal sinkronisasi data presensi dari Vercel Postgres:', err);
     }
   }, []);
 
@@ -166,7 +163,7 @@ export function AttendanceProvider({ children }) {
   const todayLeave = userTodayRecords.find(r => ['Izin', 'Sakit', 'Cuti', 'Dinas Luar'].includes(r.type));
 
   /**
-   * Helper to upload photo to RustFS (Mode Server) or generate Cloud URL
+   * Helper to upload photo to RustFS (Mode Server) or generate Google Drive link
    */
   const processEvidencePhoto = async (evidenceDataUrl, fileNamePrefix) => {
     if (!evidenceDataUrl) return null;
@@ -192,7 +189,7 @@ export function AttendanceProvider({ children }) {
       }
     }
 
-    // 2. Mode Google Cloud Storage Folder
+    // 2. Mode Google Drive Storage Folder
     if (settings.googleDriveFolderUrl) {
       return settings.googleDriveFolderUrl;
     }
@@ -266,13 +263,8 @@ export function AttendanceProvider({ children }) {
     const updated = storageService.addAttendance(newRecord);
     setRecords([newRecord, ...records.filter(r => r.id !== newRecord.id)]);
 
-    // Sync to Cloud Vercel Backend & Google Drive/Sheets
-    cloudApiService.syncAttendance(
-      newRecord,
-      settings?.googleSpreadsheetUrl,
-      settings?.googleDriveFolderUrl,
-      settings?.gasWebhookUrl
-    );
+    // Sync directly to Vercel Postgres Cloud Database
+    cloudApiService.syncAttendance(newRecord, settings?.googleDriveFolderUrl);
 
     triggerSuccessAnimation();
     showToast(`Presensi ${isShift ? shiftLabel : 'Masuk'} Berhasil! Status: ${evaluation.status}`, 'success');
@@ -360,13 +352,8 @@ export function AttendanceProvider({ children }) {
     const updated = storageService.addAttendance(newRecord);
     setRecords([newRecord, ...records.filter(r => r.id !== newRecord.id)]);
 
-    // Sync to Cloud Vercel Backend & Google Drive/Sheets
-    cloudApiService.syncAttendance(
-      newRecord,
-      settings?.googleSpreadsheetUrl,
-      settings?.googleDriveFolderUrl,
-      settings?.gasWebhookUrl
-    );
+    // Sync directly to Vercel Postgres Cloud Database
+    cloudApiService.syncAttendance(newRecord, settings?.googleDriveFolderUrl);
 
     triggerSuccessAnimation();
     showToast(`Presensi ${isShift ? shiftLabel : ''} Pulang Berhasil! Durasi: ${duration.formatted}`, 'success');
@@ -409,12 +396,7 @@ export function AttendanceProvider({ children }) {
     const updated = storageService.addAttendance(newRecord);
     setRecords([newRecord, ...records.filter(r => r.id !== newRecord.id)]);
 
-    cloudApiService.syncAttendance(
-      newRecord,
-      settings?.googleSpreadsheetUrl,
-      settings?.googleDriveFolderUrl,
-      settings?.gasWebhookUrl
-    );
+    cloudApiService.syncAttendance(newRecord, settings?.googleDriveFolderUrl);
 
     triggerSuccessAnimation();
     showToast(`Pengajuan ${type} Berhasil Terkirim & Tersimpan!`, 'success');

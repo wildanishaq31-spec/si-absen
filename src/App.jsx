@@ -8,10 +8,14 @@ import { RegisterPage } from './pages/auth/RegisterPage';
 import { AdminResetPasswordPage } from './pages/auth/AdminResetPasswordPage';
 import { DownloadPage } from './pages/download/DownloadPage';
 import { Toast } from './components/common/Toast';
+import { SplashScreen } from './components/common/SplashScreen';
 
 function AppContent() {
   const { currentUser, logout } = useAuth();
   const { toast, closeToast } = useAttendance();
+
+  // Initial App Opening Splash Screen State
+  const [showSplash, setShowSplash] = useState(true);
 
   // Helper to read current URL path
   const getPath = () => (typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '/');
@@ -130,6 +134,9 @@ function AppContent() {
   return (
     <>
       <Toast toast={toast} onClose={closeToast} />
+      {showSplash && (
+        <SplashScreen onFinish={() => setShowSplash(false)} />
+      )}
       {renderPage()}
     </>
   );

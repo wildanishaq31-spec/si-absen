@@ -14,12 +14,16 @@ function AppContent() {
   const { currentUser, logout } = useAuth();
   const { toast, closeToast } = useAttendance();
 
-  // Initial App Opening Splash Screen State
-  const [showSplash, setShowSplash] = useState(true);
-
   // Helper to read current URL path
   const getPath = () => (typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '/');
 
+  // Initial App Opening Splash Screen State (Hanya untuk Pegawai / PWA, tidak untuk Administrator di Browser Laptop)
+  const isInitialAdmin = () => {
+    const p = getPath();
+    return p.includes('administrator') || p.includes('admin');
+  };
+
+  const [showSplash, setShowSplash] = useState(() => !isInitialAdmin());
   const [currentPath, setCurrentPath] = useState(getPath);
 
   // Sync state on browser back/forward buttons
@@ -100,7 +104,8 @@ function AppContent() {
           onNavigateToResetPassword={() => navigateTo('/administrator/reset-password')}
           onLoginSuccess={(user) => {
             if (user.role === 'admin') {
-              navigateTo('/administrator/dashboard');
+              const isAdminRoute = currentPath.startsWith('/administrator') && !currentPath.includes('login') && !currentPath.includes('reset-password');
+              navigateTo(isAdminRoute ? currentPath : '/administrator/dashboard');
             } else {
               navigateTo('/pegawai/dashboard');
             }
@@ -114,6 +119,8 @@ function AppContent() {
 
     return isViewingAdmin ? (
       <AdminDashboard 
+        currentPath={currentPath}
+        onNavigate={navigateTo}
         onSwitchToUser={() => {
           logout();
           navigateTo('/pegawai/login');
@@ -134,7 +141,7 @@ function AppContent() {
   return (
     <>
       <Toast toast={toast} onClose={closeToast} />
-      {showSplash && (
+      {showSplash && !isAdminPath && (
         <SplashScreen onFinish={() => setShowSplash(false)} />
       )}
       {renderPage()}

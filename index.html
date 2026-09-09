@@ -18,10 +18,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script>
+      (function() {
+        var p = (window.location.pathname || '').toLowerCase();
+        if (p.includes('admin') || p.includes('administrator')) {
+          var style = document.createElement('style');
+          style.innerHTML = '#pwa-preloader { display: none !important; }';
+          document.head.appendChild(style);
+        }
+      })();
+    </script>
   </head>
   <body style="margin: 0; padding: 0; background-color: #004D40; overflow-x: hidden;">
     <div id="root">
-      <!-- Instant PWA Splash Screen Preloader -->
+      <!-- Instant PWA Splash Screen Preloader (Khusus Pegawai/PWA) -->
       <div id="pwa-preloader" style="position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 9999999; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; background-image: url('/splash-bg.jpg'); background-size: cover; background-position: center; background-repeat: no-repeat; background-color: #004D40; padding: 0 24px 36px 24px; box-sizing: border-box;">
         <div style="position: absolute; inset: auto 0 0 0; height: 240px; background: linear-gradient(to top, rgba(0, 30, 30, 0.85) 0%, rgba(0, 30, 30, 0.4) 60%, transparent 100%); pointer-events: none;"></div>
         <div style="position: relative; z-index: 2; width: 100%; max-width: 460px; display: flex; flex-direction: column; align-items: center; gap: 14px;">

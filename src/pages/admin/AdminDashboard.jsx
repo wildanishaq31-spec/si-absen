@@ -44,7 +44,30 @@ const WEEK_OPTIONS = [
   { value: 4, label: 'Minggu 5 (Tgl 29 - Akhir Bulan)' }
 ];
 
-export function AdminDashboard({ onSwitchToUser, onLogout }) {
+const ADMIN_TAB_ROUTES = {
+  'DASHBOARD': '/administrator/dashboard',
+  'MASUK': '/administrator/presensi-masuk',
+  'PULANG': '/administrator/presensi-pulang',
+  'REKAP_ABSENSI': '/administrator/rekap-mingguan',
+  'REKAP_TOTAL_MINGGU': '/administrator/rekap-total-perminggu',
+  'REKAP_BULAN': '/administrator/rekap-bulanan',
+  'DATA_PEGAWAI': '/administrator/data-pegawai',
+  'SETTINGS': '/administrator/pengaturan'
+};
+
+const resolveAdminTabFromPath = (path) => {
+  const p = (path || '').toLowerCase();
+  if (p.includes('presensi-masuk') || p.endsWith('/masuk')) return 'MASUK';
+  if (p.includes('presensi-pulang') || p.endsWith('/pulang')) return 'PULANG';
+  if (p.includes('rekap-total-perminggu') || p.includes('rekap-total')) return 'REKAP_TOTAL_MINGGU';
+  if (p.includes('rekap-mingguan') || p.includes('rekap-absensi')) return 'REKAP_ABSENSI';
+  if (p.includes('rekap-bulanan') || p.includes('rekap-bulan')) return 'REKAP_BULAN';
+  if (p.includes('data-pegawai') || p.includes('pegawai')) return 'DATA_PEGAWAI';
+  if (p.includes('pengaturan') || p.includes('settings')) return 'SETTINGS';
+  return 'DASHBOARD';
+};
+
+export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNavigate }) {
   const { currentUser, users, refreshUsersFromCloud, resetLocalAndCloudData } = useAuth();
   const { 
     records, 
@@ -89,7 +112,28 @@ export function AdminDashboard({ onSwitchToUser, onLogout }) {
   const [attendanceCategory, setAttendanceCategory] = useState('HARIAN');
 
   // Active Main Tab: 'DASHBOARD', 'MASUK', 'PULANG', 'REKAP_ABSENSI', 'REKAP_TOTAL_MINGGU', 'REKAP_BULAN', 'DATA_PEGAWAI', 'SETTINGS'
-  const [activeTab, setActiveTab] = useState('DASHBOARD');
+  const [activeTab, setActiveTabState] = useState(() => {
+    const initialPath = currentPath || (typeof window !== 'undefined' ? window.location.pathname : '');
+    return resolveAdminTabFromPath(initialPath);
+  });
+
+  // Function to switch tab and update browser URL
+  const setActiveTab = (tabKey) => {
+    setActiveTabState(tabKey);
+    const targetRoute = ADMIN_TAB_ROUTES[tabKey] || '/administrator/dashboard';
+    if (onNavigate) {
+      onNavigate(targetRoute);
+    } else if (typeof window !== 'undefined' && window.location.pathname.toLowerCase() !== targetRoute) {
+      window.history.pushState(null, '', targetRoute);
+    }
+  };
+
+  // Sync activeTab whenever URL / currentPath changes (e.g. browser back/forward buttons or direct navigation)
+  useEffect(() => {
+    const targetPath = currentPath || (typeof window !== 'undefined' ? window.location.pathname : '');
+    const tabFromUrl = resolveAdminTabFromPath(targetPath);
+    setActiveTabState(tabFromUrl);
+  }, [currentPath]);
 
   // Admin Profile Settings Modal State
   const [showAdminProfileModal, setShowAdminProfileModal] = useState(false);

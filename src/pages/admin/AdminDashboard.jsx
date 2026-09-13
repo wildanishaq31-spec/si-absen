@@ -4,7 +4,8 @@ import {
   Download, Search, Filter, RefreshCw, ExternalLink, 
   Settings, ShieldCheck, FileSpreadsheet, Eye, 
   Table, LayoutGrid, Check, X as CloseIcon, Layers, Sun, Moon, Sunset, LogOut, MapPin, Building2,
-  Folder, FolderTree, HardDrive, Cloud, Database, Copy, Trash2, CheckSquare, Square, Code, FileText
+  Folder, FolderTree, HardDrive, Cloud, Database, Copy, Trash2, CheckSquare, Square, Code, FileText,
+  ChevronDown, ChevronUp, Globe, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAttendance } from '../../contexts/AttendanceContext';
@@ -157,6 +158,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
   const [googleDriveFolderUrlInput, setGoogleDriveFolderUrlInput] = useState(settings?.googleDriveFolderUrl || '');
   const [testingGoogleCloud, setTestingGoogleCloud] = useState(false);
   const [showVercelTutorialModal, setShowVercelTutorialModal] = useState(false);
+  const [showVercelInlineGuide, setShowVercelInlineGuide] = useState(false);
 
   const [rustfsEndpointInput, setRustfsEndpointInput] = useState(settings?.rustfsEndpoint || '');
   const [rustfsBucketInput, setRustfsBucketInput] = useState(settings?.rustfsBucket || 'bukti-presensi');
@@ -2466,11 +2468,11 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
 
                     <button
                       type="button"
-                      onClick={() => setShowVercelTutorialModal(true)}
+                      onClick={() => setShowVercelInlineGuide(!showVercelInlineGuide)}
                       style={{
-                        backgroundColor: '#FFFFFF',
-                        color: '#065F46',
-                        border: '1px solid #A7F3D0',
+                        backgroundColor: showVercelInlineGuide ? '#059669' : '#FFFFFF',
+                        color: showVercelInlineGuide ? '#FFFFFF' : '#065F46',
+                        border: '1.5px solid #059669',
                         borderRadius: '8px',
                         padding: '11px 18px',
                         fontWeight: 700,
@@ -2478,13 +2480,144 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px'
+                        gap: '8px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: showVercelInlineGuide ? '0 4px 12px rgba(5, 150, 105, 0.25)' : 'none'
                       }}
                     >
-                      <FileText size={16} color="#059669" />
-                      <span>📖 Panduan Setup Vercel & Custom Domain</span>
+                      <FileText size={16} color={showVercelInlineGuide ? '#FFFFFF' : '#059669'} />
+                      <span>{showVercelInlineGuide ? 'Tutup Kolom Panduan' : '📖 Tampilkan Kolom Panduan Vercel & Domain'}</span>
+                      {showVercelInlineGuide ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                   </div>
+
+                  {/* INLINE EXPANDABLE TUTORIAL / GUIDELINES ACCORDION */}
+                  {showVercelInlineGuide && (
+                    <div 
+                      className="auth-card-animate"
+                      style={{
+                        marginTop: '6px',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '14px',
+                        border: '1.5px solid #A7F3D0',
+                        overflow: 'hidden',
+                        boxShadow: '0 10px 25px -5px rgba(5, 150, 105, 0.1)'
+                      }}
+                    >
+                      {/* Tutorial Header */}
+                      <div style={{ backgroundColor: '#F0FDF4', padding: '16px 20px', borderBottom: '1px solid #DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#15803D' }}>
+                            <Sparkles size={18} />
+                          </div>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#14532D' }}>
+                              Tutorial Setup Vercel Postgres & Custom Domain
+                            </h4>
+                            <p style={{ margin: 0, fontSize: '0.78rem', color: '#166534' }}>
+                              Ikuti 3 langkah praktis di bawah untuk menghubungkan database SQL dan domain instansi Anda
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowVercelTutorialModal(true)}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            color: '#059669',
+                            border: '1px solid #A7F3D0',
+                            borderRadius: '6px',
+                            padding: '6px 12px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <ExternalLink size={14} />
+                          Buka di Modal Popup
+                        </button>
+                      </div>
+
+                      {/* Tutorial Content Body */}
+                      <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '0.85rem', color: '#334155' }}>
+                        
+                        {/* Step 1: Database Postgres */}
+                        <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                            <span style={{ backgroundColor: '#059669', color: '#FFFFFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800 }}>1</span>
+                            <strong style={{ color: '#0F172A', fontSize: '0.9rem' }}>Deploy ke Vercel & Aktifkan Neon Postgres Storage</strong>
+                          </div>
+                          <ol style={{ margin: 0, paddingLeft: '20px', lineHeight: 1.6, color: '#475569' }}>
+                            <li>Buka <strong>vercel.com</strong> &rarr; Add New Project &rarr; Import repo <code>si-absen</code> Anda.</li>
+                            <li>Buka tab <strong>Storage</strong> di dashboard Vercel project &rarr; Create Database &rarr; pilih <strong>Postgres</strong> (didukung Neon).</li>
+                            <li>Klik <strong>Connect to Project</strong>. Vercel akan otomatis menyuntikkan environment variable <code>POSTGRES_URL</code> ke serverless backend API (<code>/api/sync</code>).</li>
+                            <li>Tabel <code>users</code>, <code>attendance</code>, dan <code>settings</code> akan otomatis terbuat saat pertama kali aplikasi diakses.</li>
+                          </ol>
+                        </div>
+
+                        {/* Step 2: Google Drive Storage */}
+                        <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                            <span style={{ backgroundColor: '#0284C7', color: '#FFFFFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800 }}>2</span>
+                            <strong style={{ color: '#0F172A', fontSize: '0.9rem' }}>Buat Folder Foto Bukti Absensi di Google Drive</strong>
+                          </div>
+                          <ol style={{ margin: 0, paddingLeft: '20px', lineHeight: 1.6, color: '#475569' }}>
+                            <li>Buka <strong>Google Drive</strong>, buat 1 folder (contoh: <code>FOTO_ABSENSI_PEGAWAI</code>).</li>
+                            <li>Klik kanan folder &rarr; <strong>Bagikan (Share)</strong> &rarr; ubah Akses Umum menjadi <strong>"Siapa saja yang memiliki link" (Viewer / Pelihat)</strong>.</li>
+                            <li>Salin link folder tersebut dan tempelkan ke kolom input <strong>Link Folder Google Drive</strong> di panel atas.</li>
+                          </ol>
+                        </div>
+
+                        {/* Step 3: Custom Domain */}
+                        <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                            <span style={{ backgroundColor: '#7C3AED', color: '#FFFFFF', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800 }}>3</span>
+                            <strong style={{ color: '#0F172A', fontSize: '0.9rem' }}>Pasang Custom Domain Instansi & DNS Record (SSL HTTPS Otomatis)</strong>
+                          </div>
+                          <p style={{ margin: '0 0 10px', color: '#475569', lineHeight: 1.5 }}>
+                            Buka Project Vercel &rarr; <strong>Settings</strong> &rarr; <strong>Domains</strong> &rarr; Masukkan nama domain Anda (misal: <code>absen.instansi.go.id</code> atau <code>perusahaan.com</code>). Tambahkan DNS record di provider domain Anda:
+                          </p>
+                          
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', backgroundColor: '#FFFFFF', borderRadius: '8px', overflow: 'hidden', border: '1px solid #CBD5E1' }}>
+                              <thead>
+                                <tr style={{ backgroundColor: '#F1F5F9', borderBottom: '1px solid #CBD5E1', textAlign: 'left', color: '#334155' }}>
+                                  <th style={{ padding: '8px 12px' }}>Tipe Domain</th>
+                                  <th style={{ padding: '8px 12px' }}>Type Record</th>
+                                  <th style={{ padding: '8px 12px' }}>Name / Host</th>
+                                  <th style={{ padding: '8px 12px' }}>Target / Value</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                                  <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0F172A' }}>Subdomain (misal: <code>absen.perusahaan.com</code>)</td>
+                                  <td style={{ padding: '8px 12px' }}><span style={{ backgroundColor: '#DBEAFE', color: '#1D4ED8', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>CNAME</span></td>
+                                  <td style={{ padding: '8px 12px' }}><code>absen</code></td>
+                                  <td style={{ padding: '8px 12px' }}><code>cname.vercel-dns.com</code></td>
+                                </tr>
+                                <tr>
+                                  <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0F172A' }}>Apex / Root Domain (misal: <code>perusahaan.com</code>)</td>
+                                  <td style={{ padding: '8px 12px' }}><span style={{ backgroundColor: '#DCFCE7', color: '#15803D', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>A</span></td>
+                                  <td style={{ padding: '8px 12px' }}><code>@</code> (atau kosong)</td>
+                                  <td style={{ padding: '8px 12px' }}><code>76.76.21.21</code></td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+
+                          <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', fontSize: '0.78rem', fontWeight: 700 }}>
+                            <CheckCircle2 size={16} />
+                            <span>Sertifikat SSL (HTTPS) akan diterbitkan dan diperbarui secara otomatis &amp; gratis oleh Vercel.</span>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

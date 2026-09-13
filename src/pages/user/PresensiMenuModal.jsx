@@ -77,15 +77,12 @@ export function PresensiMenuModal({
               {/* 3. D3 */}
               <div 
                 className="menu-item-card"
-                onClick={() => {
-                  handleCloseAll();
-                  onSelectMasuk('D3', 'HARIAN');
-                }}
+                onClick={() => setActiveStep('D3_CHOICE')}
               >
-                <div className="menu-icon-wrapper" style={{ backgroundColor: '#ECFDF5', color: '#10B981' }}>
+                <div className="menu-icon-wrapper" style={{ backgroundColor: '#ECFDF5', color: '#10B981', border: '1.5px solid #A7F3D0' }}>
                   <Briefcase size={28} />
                 </div>
-                <span className="menu-label">D3</span>
+                <span className="menu-label" style={{ fontWeight: 800, color: '#047857' }}>D3</span>
               </div>
 
               {/* 4. Dinas Luar */}
@@ -174,6 +171,73 @@ export function PresensiMenuModal({
                   <Clock size={36} />
                 </div>
                 <span className="choice-label-pulang">PULANG</span>
+              </div>
+            </div>
+
+            <button 
+              type="button"
+              onClick={() => setActiveStep('MAIN')}
+              style={{
+                background: '#F1F5F9',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '10px',
+                color: '#475569',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              <ArrowLeft size={16} /> Kembali ke Menu
+            </button>
+          </>
+        )}
+
+        {/* 3. SUB-MODAL ABSENSI D3 (MASUK & PULANG) */}
+        {activeStep === 'D3_CHOICE' && (
+          <>
+            <div style={{ textAlign: 'center', paddingBottom: '8px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#ECFDF5', color: '#047857', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 800, marginBottom: '6px' }}>
+                <Briefcase size={14} /> Presensi Program D3
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1E293B' }}>
+                ABSENSI <span style={{ color: '#059669' }}>D3</span>
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: '#64748B' }}>Pilih waktu presensi masuk atau pulang tugas D3 Anda</p>
+            </div>
+
+            <div className="harian-choice-grid">
+              {/* MASUK D3 */}
+              <div 
+                className="choice-card-harian masuk"
+                onClick={() => {
+                  handleCloseAll();
+                  onSelectMasuk('D3 Masuk', 'D3');
+                }}
+                style={{ borderColor: '#A7F3D0' }}
+              >
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
+                  <Clock size={36} />
+                </div>
+                <span className="choice-label-masuk" style={{ color: '#059669' }}>MASUK D3</span>
+              </div>
+
+              {/* PULANG D3 */}
+              <div 
+                className="choice-card-harian pulang"
+                onClick={() => {
+                  handleCloseAll();
+                  onSelectPulang('D3 Pulang', 'D3');
+                }}
+              >
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#FFEBEE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#DC2626' }}>
+                  <Clock size={36} />
+                </div>
+                <span className="choice-label-pulang">PULANG D3</span>
               </div>
             </div>
 

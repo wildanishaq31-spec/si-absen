@@ -37,8 +37,11 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
 
   const todayFormatted = formatIndonesianDate(new Date());
 
+  const [attendanceType, setAttendanceType] = useState('Masuk');
+
   const handleOpenMasukCamera = (type = 'Masuk', category = 'HARIAN', shiftType = null) => {
     setCameraMode('MASUK');
+    setAttendanceType(type);
     setAttendanceCategory(category);
     setActiveShiftType(shiftType);
     setShowFaceCamera(true);
@@ -46,6 +49,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
 
   const handleOpenPulangCamera = (type = 'Pulang', category = 'HARIAN', shiftType = null) => {
     setCameraMode('PULANG');
+    setAttendanceType(type);
     setAttendanceCategory(category);
     setActiveShiftType(shiftType);
     setShowFaceCamera(true);
@@ -61,6 +65,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
         locationInfo: locInfo,
         distanceMeters: distance,
         isInRadius: isInRadius,
+        type: attendanceType,
         category: attendanceCategory,
         shiftType: activeShiftType
       });
@@ -70,6 +75,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
         locationInfo: locInfo,
         distanceMeters: distance,
         isInRadius: isInRadius,
+        type: attendanceType,
         category: attendanceCategory,
         shiftType: activeShiftType
       });
@@ -254,6 +260,8 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
             ? (cameraMode === 'MASUK' 
                 ? `Verifikasi Wajah Shift Masuk (${activeShiftType === 'PAGI' ? 'Pagi' : activeShiftType === 'SORE' ? 'Sore' : 'Malam'})`
                 : `Verifikasi Wajah Shift Pulang (${activeShiftType === 'PAGI' ? 'Pagi' : activeShiftType === 'SORE' ? 'Sore' : 'Malam'})`)
+            : attendanceCategory === 'D3'
+            ? (cameraMode === 'MASUK' ? 'Verifikasi Wajah D3 Masuk' : 'Verifikasi Wajah D3 Pulang')
             : (cameraMode === 'MASUK' ? 'Verifikasi Wajah Masuk' : 'Verifikasi Wajah Pulang')
         }
       />

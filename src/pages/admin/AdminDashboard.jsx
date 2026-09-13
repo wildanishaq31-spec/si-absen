@@ -190,7 +190,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
 
   // Helper filters for presence types
   const isShiftRecord = (r) => r.category === 'SHIFT' || Boolean(r.shiftType) || r.type?.includes('Shift') || r.type?.startsWith('SHIFT_');
-  const isD3Record = (r) => r.type === 'D3';
+  const isD3Record = (r) => r.type === 'D3' || r.type === 'D3 Masuk' || r.type === 'D3 Pulang' || r.category === 'D3';
   const isDinasLuarRecord = (r) => r.type === 'Dinas Luar';
   const isIzinSakitCutiRecord = (r) => ['Izin', 'Sakit', 'Cuti'].includes(r.type);
 
@@ -209,16 +209,16 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
   const totalEmployees = employeeUsers.length;
   
   const masukRecords = allRecords.filter(r => 
-    r.type === 'Masuk' || r.type === 'HARIAN_MASUK' || r.type === 'Shift Masuk' || r.type === 'SHIFT_MASUK' || r.type === 'D3' || r.type?.toLowerCase().includes('masuk')
+    r.type === 'Masuk' || r.type === 'HARIAN_MASUK' || r.type === 'Shift Masuk' || r.type === 'SHIFT_MASUK' || r.type === 'D3' || r.type === 'D3 Masuk' || (r.category === 'D3' && r.type?.includes('Masuk')) || r.type?.toLowerCase().includes('masuk')
   );
   const pulangRecords = allRecords.filter(r => 
-    r.type === 'Pulang' || r.type === 'HARIAN_PULANG' || r.type === 'Shift Pulang' || r.type === 'SHIFT_PULANG' || r.type?.toLowerCase().includes('pulang')
+    r.type === 'Pulang' || r.type === 'HARIAN_PULANG' || r.type === 'Shift Pulang' || r.type === 'SHIFT_PULANG' || r.type === 'D3 Pulang' || (r.category === 'D3' && r.type?.includes('Pulang')) || r.type?.toLowerCase().includes('pulang')
   );
   const dinasLuarRecords = allRecords.filter(r => r.type === 'Dinas Luar');
   const izinSakitCutiRecords = allRecords.filter(r => ['Izin', 'Sakit', 'Cuti'].includes(r.type));
-  const d3Records = allRecords.filter(r => r.type === 'D3');
+  const d3Records = allRecords.filter(r => isD3Record(r));
 
-  const onTimeCount = masukRecords.filter(r => !r.isLate && r.type !== 'D3').length;
+  const onTimeCount = masukRecords.filter(r => !r.isLate && r.type !== 'D3' && r.type !== 'D3 Masuk').length;
   const lateCount = masukRecords.filter(r => r.isLate).length;
   const leaveCount = izinSakitCutiRecords.length;
 
@@ -2193,8 +2193,10 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                     <th>Timestamp</th>
                     <th>Nama Pegawai</th>
                     <th>NIP</th>
+                    <th>Jenis D3</th>
                     <th>Tanggal</th>
-                    <th>Jam Masuk</th>
+                    <th>Jam</th>
+                    <th>Jumlah Jam Kerja</th>
                     <th>Bukti Foto</th>
                     <th>Lokasi</th>
                     <th>Status</th>
@@ -2204,70 +2206,86 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                 <tbody>
                   {filteredD3.length === 0 ? (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: '28px', color: '#94A3B8' }}>
+                      <td colSpan={11} style={{ textAlign: 'center', padding: '28px', color: '#94A3B8' }}>
                         Tidak ada data presensi D3 yang ditemukan.
                       </td>
                     </tr>
                   ) : (
-                    filteredD3.map((r) => (
-                      <tr key={r.id}>
-                        <td>{r.timestamp}</td>
-                        <td style={{ fontWeight: 700, color: '#0F172A' }}>{r.userName}</td>
-                        <td style={{ fontSize: '0.75rem', color: '#64748B' }}>{r.nip || '-'}</td>
-                        <td style={{ fontWeight: 600 }}>{r.date}</td>
-                        <td style={{ fontWeight: 700, color: '#0F766E' }}>{r.time}</td>
-                        <td>
-                          {r.evidenceUrl ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <img 
-                                src={r.evidenceUrl} 
-                                alt="Bukti D3" 
-                                onClick={() => setPreviewImageUrl(r.evidenceUrl)}
-                                style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover', cursor: 'pointer', border: '1px solid #CBD5E1' }}
-                              />
-                              <a href={r.evidenceUrl} target="_blank" rel="noreferrer" className="drive-link-btn" style={{ fontSize: '0.72rem' }}>
-                                <ExternalLink size={11} />
-                              </a>
-                            </div>
-                          ) : '-'}
-                        </td>
-                        <td style={{ fontSize: '0.78rem', color: '#64748B' }}>{r.location || '-'}</td>
-                        <td>
-                          <span style={{ backgroundColor: '#CCFBF1', color: '#0F766E', padding: '3px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 700 }}>
-                            Hadir (D3)
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              showConfirm({
-                                title: 'HAPUS PRESENSI D3',
-                                message: `Hapus data presensi D3 atas nama "${r.userName}" (${r.date})?`,
-                                type: 'warning',
-                                confirmText: 'YA, HAPUS',
-                                cancelText: 'BATAL',
-                                onConfirm: async () => {
-                                  await deleteAttendanceRecords([r.id]);
-                                }
-                              });
-                            }}
-                            style={{
-                              background: '#FEE2E2',
-                              border: '1px solid #FECACA',
-                              borderRadius: '6px',
-                              color: '#DC2626',
-                              padding: '4px 8px',
-                              cursor: 'pointer',
-                              fontSize: '0.72rem',
-                              fontWeight: 700
-                            }}
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    filteredD3.map((r) => {
+                      const isPulang = r.type === 'D3 Pulang' || r.type?.toLowerCase().includes('pulang');
+                      return (
+                        <tr key={r.id}>
+                          <td>{r.timestamp}</td>
+                          <td style={{ fontWeight: 700, color: '#0F172A' }}>{r.userName}</td>
+                          <td style={{ fontSize: '0.75rem', color: '#64748B' }}>{r.nip || '-'}</td>
+                          <td>
+                            <span style={{ 
+                              padding: '3px 10px', 
+                              borderRadius: '6px', 
+                              fontSize: '0.76rem', 
+                              fontWeight: 800,
+                              backgroundColor: isPulang ? '#FFE4E6' : '#CCFBF1',
+                              color: isPulang ? '#BE123C' : '#0F766E'
+                            }}>
+                              {r.type || 'D3'}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: 600 }}>{r.date}</td>
+                          <td style={{ fontWeight: 700, color: isPulang ? '#BE123C' : '#0F766E' }}>{r.time}</td>
+                          <td style={{ fontWeight: 800, color: '#0F766E' }}>{r.workDuration || '-'}</td>
+                          <td>
+                            {r.evidenceUrl ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <img 
+                                  src={r.evidenceUrl} 
+                                  alt="Bukti D3" 
+                                  onClick={() => setPreviewImageUrl(r.evidenceUrl)}
+                                  style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover', cursor: 'pointer', border: '1px solid #CBD5E1' }}
+                                />
+                                <a href={r.evidenceUrl} target="_blank" rel="noreferrer" className="drive-link-btn" style={{ fontSize: '0.72rem' }}>
+                                  <ExternalLink size={11} />
+                                </a>
+                              </div>
+                            ) : '-'}
+                          </td>
+                          <td style={{ fontSize: '0.78rem', color: '#64748B' }}>{r.location || '-'}</td>
+                          <td>
+                            <span style={{ backgroundColor: '#ECFDF5', color: '#047857', padding: '3px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 700 }}>
+                              {r.status || 'Hadir (D3)'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                showConfirm({
+                                  title: 'HAPUS PRESENSI D3',
+                                  message: `Hapus data presensi ${r.type || 'D3'} atas nama "${r.userName}" (${r.date})?`,
+                                  type: 'warning',
+                                  confirmText: 'YA, HAPUS',
+                                  cancelText: 'BATAL',
+                                  onConfirm: async () => {
+                                    await deleteAttendanceRecords([r.id]);
+                                  }
+                                });
+                              }}
+                              style={{
+                                background: '#FEE2E2',
+                                border: '1px solid #FECACA',
+                                borderRadius: '6px',
+                                color: '#DC2626',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                fontSize: '0.72rem',
+                                fontWeight: 700
+                              }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

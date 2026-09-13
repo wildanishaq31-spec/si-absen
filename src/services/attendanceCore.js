@@ -275,11 +275,12 @@ export function buildWeeklyRecap(users = [], attendanceRecords = [], year = 2026
         } else if (category === 'IZIN_SAKIT_CUTI') {
           leave = userRecords.find(r => ['Izin', 'Sakit', 'Cuti'].includes(r.type));
         } else if (category === 'D3') {
-          checkIn = userRecords.find(r => r.type === 'D3');
+          checkIn = userRecords.find(r => r.type === 'D3' || r.type === 'D3 Masuk' || r.type === 'D3_MASUK' || (r.category === 'D3' && (r.type?.includes('Masuk') || r.type === 'D3')));
+          checkOut = userRecords.find(r => r.type === 'D3 Pulang' || r.type === 'D3_PULANG' || (r.category === 'D3' && r.type?.includes('Pulang')));
         } else {
           // SEMUA (All Categories)
-          checkIn = userRecords.find(r => ['Masuk', 'HARIAN_MASUK', 'Shift Masuk', 'SHIFT_MASUK', 'D3'].includes(r.type));
-          checkOut = userRecords.find(r => ['Pulang', 'HARIAN_PULANG', 'Shift Pulang', 'SHIFT_PULANG'].includes(r.type));
+          checkIn = userRecords.find(r => ['Masuk', 'HARIAN_MASUK', 'Shift Masuk', 'SHIFT_MASUK', 'D3', 'D3 Masuk', 'D3_MASUK'].includes(r.type) || r.type?.toLowerCase().includes('masuk'));
+          checkOut = userRecords.find(r => ['Pulang', 'HARIAN_PULANG', 'Shift Pulang', 'SHIFT_PULANG', 'D3 Pulang', 'D3_PULANG'].includes(r.type) || r.type?.toLowerCase().includes('pulang'));
           leave = userRecords.find(r => ['Izin', 'Sakit', 'Cuti', 'Dinas Luar'].includes(r.type));
         }
 
@@ -313,13 +314,28 @@ export function buildWeeklyRecap(users = [], attendanceRecords = [], year = 2026
             leaveDays++; 
           }
         } else if (checkIn) {
-          if (checkIn.type === 'D3') {
+          if (checkIn.type === 'D3' || checkIn.type === 'D3 Masuk' || checkIn.category === 'D3') {
             isD3 = true;
             d3Days++;
-            dayStatus = 'D3 (Hadir)';
-            totalSeconds += (schedule?.targetHours || 7) * 3600;
-            durationHours = schedule?.targetHours || 7;
-            durationFormatted = `${Math.floor(durationHours)}:00:00`;
+            const inEval = evaluateCheckIn(checkIn.time, currentDate);
+            lateText = inEval.lateFormatted;
+            if (inEval.isLate) lateDays++;
+
+            if (checkOut) {
+              const duration = calculateWorkDuration(checkIn.time, checkOut.time, currentDate);
+              totalSeconds += duration.seconds;
+              durationFormatted = duration.formatted;
+              durationHours = duration.decimalHours;
+              const outEval = evaluateCheckOut(checkOut.time, currentDate);
+              earlyText = outEval.earlyFormatted;
+              if (outEval.isEarly) earlyDays++;
+              dayStatus = 'D3 (Lengkap)';
+            } else {
+              dayStatus = 'D3 (Hadir)';
+              totalSeconds += (schedule?.targetHours || 7) * 3600;
+              durationHours = schedule?.targetHours || 7;
+              durationFormatted = `${Math.floor(durationHours)}:00:00`;
+            }
           } else {
             presentDays++;
             

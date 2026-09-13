@@ -151,8 +151,11 @@ export function AttendanceProvider({ children }) {
     r => currentUser && (r.email === currentUser.email || r.userName === currentUser.name) && r.date === todayStr
   );
 
-  const todayCheckIn = userTodayRecords.find(r => r.type === 'Masuk' || r.type === 'HARIAN_MASUK' || r.type === 'Shift Masuk');
-  const todayCheckOut = userTodayRecords.find(r => r.type === 'Pulang' || r.type === 'HARIAN_PULANG' || r.type === 'Shift Pulang');
+  const isCheckInType = (t) => ['Masuk', 'HARIAN_MASUK', 'Shift Masuk', 'SHIFT_MASUK', 'D3 Masuk', 'D3', 'D3_MASUK'].includes(t) || t?.toLowerCase().includes('masuk');
+  const isCheckOutType = (t) => ['Pulang', 'HARIAN_PULANG', 'Shift Pulang', 'SHIFT_PULANG', 'D3 Pulang', 'D3_PULANG'].includes(t) || t?.toLowerCase().includes('pulang');
+
+  const todayCheckIn = userTodayRecords.find(r => isCheckInType(r.type));
+  const todayCheckOut = userTodayRecords.find(r => isCheckOutType(r.type));
   const todayLeave = userTodayRecords.find(r => ['Izin', 'Sakit', 'Cuti', 'Dinas Luar'].includes(r.type));
 
   /**
@@ -191,7 +194,7 @@ export function AttendanceProvider({ children }) {
   };
 
   /**
-   * Submit Check-in (Masuk / Shift Masuk)
+   * Submit Check-in (Masuk / Shift Masuk / D3 Masuk)
    */
   const doCheckIn = async ({ 
     evidenceDataUrl, 
@@ -216,6 +219,7 @@ export function AttendanceProvider({ children }) {
     
     let evaluation;
     const isShift = category === 'SHIFT' || Boolean(shiftType);
+    const isD3 = category === 'D3' || type === 'D3 Masuk' || type === 'D3';
     
     if (isShift) {
       evaluation = evaluateShiftCheckIn(timeStr, shiftType || 'PAGI', now);
@@ -223,8 +227,9 @@ export function AttendanceProvider({ children }) {
       evaluation = evaluateCheckIn(timeStr, now);
     }
 
-    const recordType = isShift ? 'Shift Masuk' : (type || 'Masuk');
-    const shiftLabel = isShift ? (shiftType === 'PAGI' ? 'Shift Pagi' : shiftType === 'SORE' ? 'Shift Sore' : 'Shift Malam') : null;
+    const recordType = isShift ? 'Shift Masuk' : (isD3 ? 'D3 Masuk' : (type || 'Masuk'));
+    const recordCategory = isShift ? 'SHIFT' : (isD3 ? 'D3' : 'HARIAN');
+    const shiftLabel = isShift ? (shiftType === 'PAGI' ? 'Shift Pagi' : shiftType === 'SORE' ? 'Shift Sore' : 'Shift Malam') : (isD3 ? 'D3' : null);
     const compositeKeyStr = generateCompositeKey(currentUser.name, now, recordType);
 
     // Process photo to RustFS / Drive
@@ -238,7 +243,7 @@ export function AttendanceProvider({ children }) {
       nip: currentUser.nip || '',
       skpd: currentUser.skpd || '',
       type: recordType,
-      category: isShift ? 'SHIFT' : 'HARIAN',
+      category: recordCategory,
       shiftType: isShift ? (shiftType || 'PAGI') : null,
       shiftName: shiftLabel,
       shiftTimeStart: isShift ? (shiftType === 'SORE' ? '14:00' : shiftType === 'MALAM' ? '21:00' : '07:00') : null,
@@ -260,18 +265,19 @@ export function AttendanceProvider({ children }) {
     cloudApiService.syncAttendance(newRecord, settings?.googleDriveFolderUrl);
 
     triggerSuccessAnimation();
-    showToast(`Presensi ${isShift ? shiftLabel : 'Masuk'} Berhasil! Status: ${evaluation.status}`, 'success');
+    showToast(`Presensi ${isShift ? shiftLabel : (isD3 ? 'D3 Masuk' : 'Masuk')} Berhasil! Status: ${evaluation.status}`, 'success');
     return { success: true, record: newRecord };
   };
 
   /**
-   * Submit Check-out (Pulang / Shift Pulang)
+   * Submit Check-out (Pulang / Shift Pulang / D3 Pulang)
    */
   const doCheckOut = async ({ 
     evidenceDataUrl, 
     locationInfo, 
     distanceMeters, 
     isInRadius = true,
+    type = 'Pulang',
     category = 'HARIAN',
     shiftType = null 
   }) => {
@@ -288,6 +294,7 @@ export function AttendanceProvider({ children }) {
     const timeStr = formatTimeHMS(now);
 
     const isShift = category === 'SHIFT' || Boolean(shiftType);
+    const isD3 = category === 'D3' || type === 'D3 Pulang';
     let evaluation;
     let duration;
 
@@ -295,7 +302,9 @@ export function AttendanceProvider({ children }) {
     const matchingCheckIn = userTodayRecords.find(r => 
       isShift 
         ? (r.category === 'SHIFT' && (r.type === 'Shift Masuk' || r.type === 'Masuk'))
-        : (r.category !== 'SHIFT' && (r.type === 'Masuk' || r.type === 'HARIAN_MASUK'))
+        : isD3
+        ? (r.category === 'D3' || r.type === 'D3 Masuk' || r.type === 'D3')
+        : (r.category !== 'SHIFT' && r.category !== 'D3' && (r.type === 'Masuk' || r.type === 'HARIAN_MASUK'))
     ) || todayCheckIn;
 
     const checkInTimeRef = matchingCheckIn ? matchingCheckIn.time : (isShift ? (shiftType === 'SORE' ? '14:00' : shiftType === 'MALAM' ? '21:00' : '07:00') : '07:30');
@@ -310,8 +319,9 @@ export function AttendanceProvider({ children }) {
       duration = calculateWorkDuration(checkInTimeRef, timeStr, now);
     }
 
-    const recordType = isShift ? 'Shift Pulang' : 'Pulang';
-    const shiftLabel = isShift ? (shiftType === 'PAGI' ? 'Shift Pagi' : shiftType === 'SORE' ? 'Shift Sore' : 'Shift Malam') : null;
+    const recordType = isShift ? 'Shift Pulang' : (isD3 ? 'D3 Pulang' : (type || 'Pulang'));
+    const recordCategory = isShift ? 'SHIFT' : (isD3 ? 'D3' : 'HARIAN');
+    const shiftLabel = isShift ? (shiftType === 'PAGI' ? 'Shift Pagi' : shiftType === 'SORE' ? 'Shift Sore' : 'Shift Malam') : (isD3 ? 'D3' : null);
     const compositeKeyStr = generateCompositeKey(currentUser.name, now, recordType);
 
     // Process photo to RustFS / Drive
@@ -325,7 +335,7 @@ export function AttendanceProvider({ children }) {
       nip: currentUser.nip || '',
       skpd: currentUser.skpd || '',
       type: recordType,
-      category: isShift ? 'SHIFT' : 'HARIAN',
+      category: recordCategory,
       shiftType: isShift ? (shiftType || matchingCheckIn?.shiftType || 'PAGI') : null,
       shiftName: shiftLabel,
       shiftTimeStart: isShift ? (shiftType === 'SORE' ? '14:00' : shiftType === 'MALAM' ? '21:00' : '07:00') : null,
@@ -349,7 +359,7 @@ export function AttendanceProvider({ children }) {
     cloudApiService.syncAttendance(newRecord, settings?.googleDriveFolderUrl);
 
     triggerSuccessAnimation();
-    showToast(`Presensi ${isShift ? shiftLabel : ''} Pulang Berhasil! Durasi: ${duration.formatted}`, 'success');
+    showToast(`Presensi ${isShift ? shiftLabel : (isD3 ? 'D3' : '')} Pulang Berhasil! Durasi: ${duration.formatted}`, 'success');
     return { success: true, record: newRecord };
   };
 

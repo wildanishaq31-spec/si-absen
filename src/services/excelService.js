@@ -18,13 +18,13 @@ export function exportAttendanceExcel(users, attendanceRecords, year = 2026, mon
 
   // 1. Sheet "Absen Masuk"
   const masukRows = records
-    .filter(r => r.type === 'Masuk' || r.type === 'HARIAN_MASUK' || r.type === 'Shift Masuk' || r.type === 'SHIFT_MASUK' || r.type === 'D3')
+    .filter(r => r.type === 'Masuk' || r.type === 'HARIAN_MASUK' || r.type === 'Shift Masuk' || r.type === 'SHIFT_MASUK' || r.type === 'D3' || r.type === 'D3 Masuk' || (r.category === 'D3' && r.type?.includes('Masuk')))
     .map(r => ({
       'Timestamp': r.timestamp || '',
       'Email Address': r.email || '',
       'Nama Pegawai': r.userName || '',
       'Jenis Presensi': r.type || 'Masuk',
-      'Kategori/Shift': r.shiftName || r.shiftType || (r.type === 'D3' ? 'D3' : 'Harian'),
+      'Kategori/Shift': r.shiftName || r.shiftType || (r.type?.includes('D3') || r.category === 'D3' ? 'D3' : 'Harian'),
       'Bukti Foto': r.evidenceUrl || '',
       'Tanggal': r.date || '',
       'Jam': r.time || '',
@@ -39,12 +39,13 @@ export function exportAttendanceExcel(users, attendanceRecords, year = 2026, mon
 
   // 2. Sheet "Absen Pulang"
   const pulangRows = records
-    .filter(r => r.type === 'Pulang' || r.type === 'HARIAN_PULANG' || r.type === 'Shift Pulang' || r.type === 'SHIFT_PULANG')
+    .filter(r => r.type === 'Pulang' || r.type === 'HARIAN_PULANG' || r.type === 'Shift Pulang' || r.type === 'SHIFT_PULANG' || r.type === 'D3 Pulang' || (r.category === 'D3' && r.type?.includes('Pulang')))
     .map(r => ({
       'Timestamp': r.timestamp || '',
       'Email Address': r.email || '',
       'Nama Pegawai': r.userName || '',
-      'Kategori/Shift': r.shiftName || r.shiftType || 'Harian',
+      'Jenis Presensi': r.type || 'Pulang',
+      'Kategori/Shift': r.shiftName || r.shiftType || (r.type?.includes('D3') || r.category === 'D3' ? 'D3' : 'Harian'),
       'Bukti Foto': r.evidenceUrl || '',
       'Tanggal': r.date || '',
       'Jam': r.time || '',
@@ -100,16 +101,18 @@ export function exportAttendanceExcel(users, attendanceRecords, year = 2026, mon
 
   // 5. Sheet "Daftar Presensi D3"
   const d3Rows = records
-    .filter(r => r.type === 'D3')
+    .filter(r => r.type === 'D3' || r.type === 'D3 Masuk' || r.type === 'D3 Pulang' || r.category === 'D3')
     .map(r => ({
       'Timestamp': r.timestamp || '',
       'Nama Pegawai': r.userName || '',
       'NIP': r.nip || '-',
+      'Tipe Presensi': r.type || (r.category === 'D3' ? 'D3' : 'D3'),
       'Tanggal': r.date || '',
-      'Jam Masuk': r.time || '',
+      'Jam': r.time || '',
+      'Jumlah Jam Kerja': r.workDuration || '-',
       'Lokasi': r.location || '',
       'Bukti Foto': r.evidenceUrl || '',
-      'Status': 'Hadir (D3)'
+      'Status': r.status || 'Hadir (D3)'
     }));
 
   if (d3Rows.length > 0) {
@@ -160,7 +163,7 @@ export function exportAttendanceExcel(users, attendanceRecords, year = 2026, mon
     const userRecs = records.filter(r => r.email === user.email || r.userName === user.name);
     const hadirHarian = userRecs.filter(r => (r.type === 'Masuk' || r.type === 'HARIAN_MASUK') && r.category !== 'SHIFT').length;
     const hadirShift = userRecs.filter(r => r.type === 'Shift Masuk' || r.type === 'SHIFT_MASUK' || r.category === 'SHIFT').length;
-    const hadirD3 = userRecs.filter(r => r.type === 'D3').length;
+    const hadirD3 = userRecs.filter(r => r.type === 'D3' || r.type === 'D3 Masuk' || (r.category === 'D3' && !r.type?.includes('Pulang'))).length;
     const dinasLuar = userRecs.filter(r => r.type === 'Dinas Luar').length;
     const izin = userRecs.filter(r => r.type === 'Izin').length;
     const sakit = userRecs.filter(r => r.type === 'Sakit').length;

@@ -2329,6 +2329,143 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                 </div>
               )}
 
+              {/* PANEL 2: PENGATURAN VERCEL POSTGRES & GOOGLE DRIVE STORAGE */}
+              {storageProviderInput === 'GOOGLE' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', background: '#F8FAFC', padding: '20px', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
+                  
+                  {/* Status Banner */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ECFDF5', padding: '12px 16px', borderRadius: '10px', border: '1px solid #A7F3D0' }}>
+                    <CheckCircle2 size={20} color="#059669" />
+                    <div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#065F46' }}>
+                        Mode Aktif: Vercel Postgres (Neon) & Google Drive Storage
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#047857' }}>
+                        Seluruh akun pegawai, riwayat presensi masuk/pulang, shift, dan rekap disinkronkan langsung ke database cloud PostgreSQL. Foto bukti otomatis disimpan ke Google Drive.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Form Inputs Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+                    {/* Status Database Postgres */}
+                    <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: '10px', border: '1.5px solid #CBD5E1', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                          <Database size={16} color="#059669" />
+                          <span>Database Cloud Utama: <strong>Vercel Postgres (Neon)</strong></span>
+                        </label>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748B', lineHeight: 1.4 }}>
+                          Tersambung langsung via serverless environment variable <code>POSTGRES_URL</code>. Tabel <code>users</code>, <code>attendance</code>, dan <code>settings</code> terkelola otomatis.
+                        </p>
+                      </div>
+                      <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', backgroundColor: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }}></span>
+                          Terkoneksi Otomatis
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Link Folder Google Drive */}
+                    <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: '10px', border: '1.5px solid #CBD5E1' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                        <Folder size={16} color="#0284C7" />
+                        <span>Link Folder Utama Google Drive (Penyimpanan Foto Bukti)</span>
+                      </label>
+                      <input
+                        type="url"
+                        placeholder="https://drive.google.com/drive/folders/1aBcDeFgHiJkLmNoPqRsTuVwXyZ"
+                        value={googleDriveFolderUrlInput}
+                        onChange={(e) => setGoogleDriveFolderUrlInput(e.target.value)}
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
+                      />
+                      <span style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '4px', display: 'block' }}>
+                        ID Folder Drive: <code>{cloudApiService.extractFolderId(googleDriveFolderUrlInput) || '(Tempel URL Folder Drive di atas)'}</code>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Vercel Serverless Information Alert */}
+                  <div style={{ backgroundColor: '#ECFDF5', border: '1.5px solid #A7F3D0', padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                    <Cloud size={24} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <h4 style={{ margin: '0 0 4px', fontSize: '0.9rem', fontWeight: 800, color: '#065F46' }}>
+                        ✅ Backend Vercel Serverless & Postgres Aktif (Bebas Apps Script & Bebas Lemot)
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: '#047857', lineHeight: 1.5 }}>
+                        Integrasi database cloud dikelola langsung oleh Vercel API (<code>/api/sync</code>) menggunakan driver Neon Serverless. Untuk mengunduh laporan multi-sheet kapan saja, gunakan tombol <strong>"Unduh Excel Rekap"</strong> di tab Riwayat Presensi.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const newSettings = {
+                          ...settings,
+                          storageProvider: 'GOOGLE',
+                          googleDriveFolderUrl: googleDriveFolderUrlInput.trim()
+                        };
+                        updateSettings(newSettings);
+                        await cloudApiService.saveCentralSettings(newSettings);
+                        showSuccess('Konfigurasi Cloud Storage & Database berhasil disimpan!');
+                        if (refreshUsersFromCloud) refreshUsersFromCloud();
+                        if (refreshAttendanceFromCloud) refreshAttendanceFromCloud();
+                      }}
+                      style={{
+                        backgroundColor: '#059669',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '11px 22px',
+                        fontWeight: 800,
+                        fontSize: '0.9rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 3px 10px rgba(5, 150, 105, 0.25)'
+                      }}
+                    >
+                      Simpan Konfigurasi Storage
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setTestingGoogleCloud(true);
+                        try {
+                          const res = await cloudApiService.testGoogleIntegration(
+                            googleDriveFolderUrlInput.trim()
+                          );
+                          if (res.success) {
+                            showSuccess(res.message, 'UJI KONEKSI DATABASE BERHASIL');
+                          } else {
+                            showError(res.message, 'UJI KONEKSI DATABASE GAGAL');
+                          }
+                        } catch (err) {
+                          showError(`Koneksi gagal: ${err.message}`, 'KONEKSI GAGAL');
+                        } finally {
+                          setTestingGoogleCloud(false);
+                        }
+                      }}
+                      style={{
+                        backgroundColor: '#ECFDF5',
+                        color: '#059669',
+                        border: '1px solid #A7F3D0',
+                        borderRadius: '8px',
+                        padding: '11px 18px',
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {testingGoogleCloud ? 'Menguji Database...' : '🧪 Uji Koneksi Vercel Postgres & Drive'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* PANEL 3: PENGATURAN DEDICATED SERVER RUSTFS */}
               {storageProviderInput === 'SERVER' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', background: '#FAF5FF', padding: '20px', borderRadius: '14px', border: '1px solid #E9D5FF' }}>

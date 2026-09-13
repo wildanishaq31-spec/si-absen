@@ -196,7 +196,9 @@ export function AuthProvider({ children }) {
       role: 'pegawai',
       nip: nipClean,
       skpd: skpd.trim(),
-      photo: photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+      photo: photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      faceDescriptor: faceDescriptor || null,
+      face_descriptor: faceDescriptor || null
     };
 
     const saved = storageService.addUser(newUser);

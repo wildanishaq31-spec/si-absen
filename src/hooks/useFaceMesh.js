@@ -1,4 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { 
+  extractFaceDescriptor, 
+  compareFaceDescriptors, 
+  averageFaceDescriptors 
+} from '../utils/faceBiometrics';
 
 /**
  * Calculates Euclidean distance between two points
@@ -61,18 +66,29 @@ const CONTOUR_LANDMARKS = [
   151, 9, 8, 123, 352, 205, 425
 ];
 
-export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }) {
+export function useFaceMesh({ 
+  videoRef, 
+  canvasRef, 
+  isActive, 
+  masterFaceDescriptor = null,
+  isEnrollment = false,
+  onLivenessSuccess,
+  onMatchFailed
+}) {
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [faceDetected, setFaceDetected] = useState(false);
   const [faceInGuide, setFaceInGuide] = useState(false);
-  const [promptText, setPromptText] = useState('Kedipkan Mata');
+  const [promptText, setPromptText] = useState(isEnrollment ? 'Perekaman Wajah' : 'Kedipkan Mata');
   const [promptSubtitle, setPromptSubtitle] = useState('(Tahan 1 Detik)');
   const [progress, setProgress] = useState(0); // 0 to 100
   const [isVerified, setIsVerified] = useState(false);
+  const [matchError, setMatchError] = useState(null);
+  const [lastScorePercent, setLastScorePercent] = useState(null);
 
   const faceMeshRef = useRef(null);
   const animationFrameRef = useRef(null);
   const verifiedRef = useRef(false);
+  const descriptorSamplesRef = useRef([]);
 
   // Dynamic Eye Baseline & Blink State Tracker
   const blinkStateRef = useRef({
@@ -83,12 +99,16 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     closedTimestamp: null
   });
 
-  // Initialize MediaPipe FaceMesh
+  // Reset internal states on activation
   useEffect(() => {
     let isMounted = true;
     verifiedRef.current = false;
     setIsVerified(false);
     setProgress(0);
+    setMatchError(null);
+    setLastScorePercent(null);
+    descriptorSamplesRef.current = [];
+
     blinkStateRef.current = {
       calibratedFrames: 0,
       openEyeBaseline: 0,
@@ -153,7 +173,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
 
         if (isMounted) {
           setIsModelLoading(false);
-          setPromptText('Kedipkan Mata');
+          setPromptText(isEnrollment ? 'Kedipkan Mata' : 'Kedipkan Mata');
           setPromptSubtitle('(Tahan 1 Detik)');
         }
       } catch (err) {
@@ -180,7 +200,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
         faceMeshRef.current = null;
       }
     };
-  }, [isActive]);
+  }, [isActive, isEnrollment]);
 
   // Main Detection Loop
   const runDetection = useCallback(async () => {
@@ -209,7 +229,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     };
   }, [isModelLoading, isActive, runDetection]);
 
-  // Process Landmarks, Enforce Frontal Face, and Strict 2-Phase Blink
+  // Process Landmarks, Enforce Frontal Face, and Strict 2-Phase Blink & Recognition
   const processFaceResults = (results) => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
@@ -254,12 +274,13 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     const isHeadTilted = eyeTilt > 0.16;
     const isCentered = noseTip.x > 0.12 && noseTip.x < 0.88 && noseTip.y > 0.10 && noseTip.y < 0.90;
 
-    setFaceInGuide(isCentered && !isFacingSideways && !isHeadTilted);
+    const isFacePositionValid = isCentered && !isFacingSideways && !isHeadTilted;
+    setFaceInGuide(isFacePositionValid);
 
-    // Draw clean facial contour green dots (exact SIPP look)
+    // Draw facial contour green dots (exact SIPP look)
     ctx.save();
-    ctx.fillStyle = '#4ADE80';
-    ctx.shadowColor = '#22C55E';
+    ctx.fillStyle = matchError ? '#EF4444' : '#4ADE80';
+    ctx.shadowColor = matchError ? '#DC2626' : '#22C55E';
     ctx.shadowBlur = 3;
 
     for (let i = 0; i < CONTOUR_LANDMARKS.length; i++) {
@@ -299,24 +320,36 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       return;
     }
 
+    // Collect frame sample if position is good
+    if (isFacePositionValid) {
+      const currentDesc = extractFaceDescriptor(landmarks);
+      if (currentDesc) {
+        descriptorSamplesRef.current.push(currentDesc);
+        if (descriptorSamplesRef.current.length > 10) {
+          descriptorSamplesRef.current.shift();
+        }
+      }
+    }
+
     // 2. Adaptive Relative Drop Eye-Blink Detection (100% Reliable for all eye shapes)
     const eyeOpenness = getEyeOpenness(landmarks);
     if (!eyeOpenness) return;
 
     const tracker = blinkStateRef.current;
-    setPromptText('Kedipkan Mata');
-    setPromptSubtitle('(Tahan 1 Detik)');
+    if (!matchError) {
+      setPromptText(isEnrollment ? 'Kedipkan Mata' : 'Kedipkan Mata');
+      setPromptSubtitle('(Tahan 1 Detik)');
+    }
 
     // Step A: Calibrate the user's OPEN eye baseline
     if (tracker.calibratedFrames < 8) {
-      // First 8 frames track open eyes baseline
       tracker.openEyeBaseline = tracker.openEyeBaseline === 0 
         ? eyeOpenness 
         : Math.max(tracker.openEyeBaseline, eyeOpenness);
       tracker.calibratedFrames += 1;
       tracker.isEyesOpen = true;
       setProgress(20);
-      return; // Wait until open eye baseline is calibrated!
+      return;
     }
 
     // Keep updating the maximum open eye ratio if user opens eyes wider
@@ -325,9 +358,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     }
 
     const baseline = tracker.openEyeBaseline;
-    // EYES CLOSED = Eye ratio drops below 60% of their open eye baseline (or absolute < 0.12)
     const isEyesClosed = eyeOpenness <= (baseline * 0.60) || eyeOpenness < 0.12;
-    // EYES OPEN = Eye ratio is above 80% of their open eye baseline
     const isEyesOpen = eyeOpenness >= (baseline * 0.80);
 
     // Phase 1: User is looking at camera with open eyes
@@ -338,7 +369,7 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       // => 1X COMPLETE NATURAL BLINK (Open ➔ Closed ➔ Reopened)!
       if (tracker.hasClosed && !verifiedRef.current) {
         setProgress(100);
-        handleVerificationSuccess();
+        handleBlinkComplete(landmarks);
         return;
       }
 
@@ -356,32 +387,136 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
       const pct = Math.min(100, Math.round(50 + (closedDuration / 200) * 50));
       setProgress(pct);
 
-      // If held closed for >= 200ms: Verify instantly!
+      // If held closed for >= 200ms: Complete blink!
       if (closedDuration >= 200 && !verifiedRef.current) {
         setProgress(100);
-        handleVerificationSuccess();
+        handleBlinkComplete(landmarks);
       }
     }
   };
 
-  const handleVerificationSuccess = () => {
+  /**
+   * Called when physical blink is completed.
+   * Performs Face Descriptor extraction, Master Biometric Comparison or Enrollment.
+   */
+  const handleBlinkComplete = (landmarks) => {
+    if (verifiedRef.current) return;
+
+    // 1. Extract high quality descriptor (average of recent samples + current)
+    const currentDescriptor = extractFaceDescriptor(landmarks);
+    const samples = [...descriptorSamplesRef.current];
+    if (currentDescriptor) samples.push(currentDescriptor);
+
+    const finalDescriptor = averageFaceDescriptors(samples) || currentDescriptor;
+
+    // ENROLLMENT MODE: Perekaman Master Biometrik Baru
+    if (isEnrollment) {
+      verifiedRef.current = true;
+      setIsVerified(true);
+      setProgress(100);
+      setPromptText('✓ Master Wajah Terekam');
+      setPromptSubtitle('Biometrik berhasil disimpan!');
+
+      if (navigator.vibrate) {
+        try { navigator.vibrate([80, 40, 80]); } catch (e) {}
+      }
+
+      if (onLivenessSuccess) {
+        setTimeout(() => {
+          onLivenessSuccess({
+            descriptor: finalDescriptor,
+            isMatch: true,
+            scorePercent: 100
+          });
+        }, 200);
+      }
+      return;
+    }
+
+    // ATTENDANCE MODE: Cek Kemiripan Wajah dengan Master Profile (1:1 Face Matching)
+    let isMatch = true;
+    let scorePercent = 100;
+    let similarityVal = 1.0;
+
+    // If masterFaceDescriptor exists, enforce strict biometrics matching
+    if (masterFaceDescriptor && Array.isArray(masterFaceDescriptor) && masterFaceDescriptor.length > 0) {
+      const matchResult = compareFaceDescriptors(finalDescriptor, masterFaceDescriptor, 0.78);
+      isMatch = matchResult.isMatch;
+      scorePercent = matchResult.scorePercent;
+      similarityVal = matchResult.similarity;
+      setLastScorePercent(scorePercent);
+
+      if (!isMatch) {
+        // MISMATCH DETECTED: Wajah Teman / Orang Lain!
+        setMatchError(`Wajah tidak cocok (${scorePercent}%). Absensi ditolak!`);
+        setPromptText('❌ Wajah Tidak Sesuai!');
+        setPromptSubtitle(`Kemiripan ${scorePercent}% (Minimal 78%)`);
+        setProgress(0);
+        blinkStateRef.current.hasClosed = false;
+
+        // Vibrate warning
+        if (navigator.vibrate) {
+          try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+        }
+
+        if (onMatchFailed) {
+          onMatchFailed({
+            scorePercent,
+            similarity: similarityVal,
+            message: `Wajah yang terdeteksi tidak cocok dengan data biometrik terdaftar (${scorePercent}%). Titip absen tidak diperkenankan!`
+          });
+        }
+
+        // Reset after 2.8 seconds so user can re-try with valid face
+        setTimeout(() => {
+          setMatchError(null);
+          setPromptText('Kedipkan Mata');
+          setPromptSubtitle('(Tahan 1 Detik)');
+          verifiedRef.current = false;
+        }, 2800);
+
+        return;
+      }
+    }
+
+    // MATCHED & VERIFIED
+    verifiedRef.current = true;
+    setIsVerified(true);
+    setProgress(100);
+    setPromptText('✓ Wajah Terverifikasi');
+    setPromptSubtitle(`Kemiripan ${scorePercent}% • Memproses presensi...`);
+
+    if (navigator.vibrate) {
+      try { navigator.vibrate([80, 40, 80]); } catch (e) {}
+    }
+
+    if (onLivenessSuccess) {
+      setTimeout(() => {
+        onLivenessSuccess({
+          descriptor: finalDescriptor,
+          isMatch: true,
+          scorePercent,
+          similarity: similarityVal
+        });
+      }, 250);
+    }
+  };
+
+  const handleManualTriggerSuccess = () => {
     if (verifiedRef.current) return;
     verifiedRef.current = true;
     setIsVerified(true);
     setProgress(100);
     setPromptText('✓ Verifikasi Berhasil');
-    setPromptSubtitle('Memproses presensi...');
-
-    // Haptic vibration feedback on mobile
-    if (navigator.vibrate) {
-      try {
-        navigator.vibrate([80, 40, 80]);
-      } catch (e) {}
-    }
+    setPromptSubtitle('Memproses...');
 
     if (onLivenessSuccess) {
       setTimeout(() => {
-        onLivenessSuccess();
+        onLivenessSuccess({
+          descriptor: null,
+          isMatch: true,
+          scorePercent: 100
+        });
       }, 150);
     }
   };
@@ -394,6 +529,8 @@ export function useFaceMesh({ videoRef, canvasRef, isActive, onLivenessSuccess }
     promptSubtitle,
     progress,
     isVerified,
-    triggerManualSuccess: handleVerificationSuccess
+    matchError,
+    lastScorePercent,
+    triggerManualSuccess: handleManualTriggerSuccess
   };
 }

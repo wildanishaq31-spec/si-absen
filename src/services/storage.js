@@ -22,9 +22,13 @@ export const INITIAL_USERS = [
 // Clean Attendance: Completely Empty []
 export const INITIAL_ATTENDANCE = [];
 
-// Settings with Dual Storage Configuration (Vercel Postgres & Google Drive Storage vs Dedicated RustFS Server)
+// Settings with Triple Storage Configuration:
+// 1. 'SPREADSHEET' (Google Spreadsheet & Google Drive via Apps Script - 100% Gratis)
+// 2. 'GOOGLE' (Vercel Postgres & Google Drive)
+// 3. 'SERVER' (Dedicated RustFS / VPS Storage Server)
 export const INITIAL_SETTINGS = {
-  storageProvider: 'GOOGLE', // 'GOOGLE' (Vercel Postgres & Google Drive) vs 'SERVER' (Dedicated RustFS Storage Server)
+  storageProvider: 'SPREADSHEET', // 'SPREADSHEET' | 'GOOGLE' | 'SERVER'
+  gasDeploymentUrl: '', // URL Web App Google Apps Script (https://script.google.com/macros/s/.../exec)
   googleDriveFolderUrl: '', // Link Folder Google Drive (https://drive.google.com/drive/folders/...)
   
   rustfsEndpoint: '', // URL Endpoint Server RustFS (contoh: https://rustfs.pkmcermee.my.id)

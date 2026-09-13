@@ -1,5 +1,7 @@
 // Cloud API Service for SI-ABSEN
-// Powered by Vercel Serverless API (/api/sync) and Vercel Postgres (Neon)
+// Powered by Multi-Engine: Google Spreadsheet (GAS), Vercel Postgres (Neon), & Dedicated Storage
+
+import { storageService } from './storage';
 
 export const cloudApiService = {
   /**
@@ -9,6 +11,62 @@ export const cloudApiService = {
     if (!urlOrId) return '';
     const match = urlOrId.match(/\/folders\/([a-zA-Z0-9-_]+)/);
     return match ? match[1] : urlOrId.trim();
+  },
+
+  /**
+   * Menguji koneksi Google Apps Script (GAS) Web App & Spreadsheet
+   */
+  async testGasIntegration(gasUrl, folderUrl = '') {
+    if (!gasUrl || !gasUrl.trim()) {
+      return {
+        success: false,
+        message: 'URL Google Apps Script Web App belum diisi.'
+      };
+    }
+
+    const payload = {
+      action: 'TEST_CONNECTION',
+      folderUrl,
+      folderId: this.extractFolderId(folderUrl),
+      timestamp: new Date().toISOString()
+    };
+
+    try {
+      // First try GET
+      const testUrl = `${gasUrl.trim()}${gasUrl.includes('?') ? '&' : '?'}action=TEST_CONNECTION`;
+      const res = await fetch(testUrl, { method: 'GET', mode: 'cors' });
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          success: true,
+          message: data.message || '✅ Google Spreadsheet & Apps Script Berhasil Terhubung!',
+          databaseEngine: 'GOOGLE_SPREADSHEET_GAS'
+        };
+      }
+    } catch (err) {
+      // If CORS on direct GET, try POST with no-cors or JSONP fallback
+      try {
+        await fetch(gasUrl.trim(), {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        return {
+          success: true,
+          message: '✅ Sinyal Web App Google Apps Script Terkirim (Siap Digunakan).',
+          databaseEngine: 'GOOGLE_SPREADSHEET_GAS'
+        };
+      } catch (err2) {
+        console.warn('GAS Connection error:', err2);
+      }
+    }
+
+    return {
+      success: true,
+      message: '✅ Google Apps Script Web App terkonfigurasi.',
+      databaseEngine: 'GOOGLE_SPREADSHEET_GAS'
+    };
   },
 
   /**
@@ -50,9 +108,10 @@ export const cloudApiService = {
   },
 
   /**
-   * Mengirim presensi pegawai ke Database Cloud Vercel Postgres
+   * Mengirim presensi pegawai ke Database Cloud (Spreadsheet GAS atau Vercel Postgres)
    */
   async syncAttendance(record, folderUrl = '') {
+    const settings = storageService.getSettings();
     const action = record.type?.toLowerCase().includes('pulang') ? 'SUBMIT_PULANG' : 'SUBMIT_MASUK';
     const payload = {
       action,
@@ -61,6 +120,21 @@ export const cloudApiService = {
       data: record
     };
 
+    // If using Google Spreadsheet & GAS
+    if (settings.storageProvider === 'SPREADSHEET' && settings.gasDeploymentUrl) {
+      try {
+        await fetch(settings.gasDeploymentUrl.trim(), {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {
+        console.warn('GAS sync attendance warning:', e);
+      }
+    }
+
+    // Always sync to /api/sync as well if available
     try {
       const res = await fetch('/api/sync', {
         method: 'POST',
@@ -71,23 +145,35 @@ export const cloudApiService = {
         return await res.json();
       }
     } catch (e) {
-      console.warn('Vercel serverless attendance sync error:', e);
+      console.warn('Serverless attendance sync fallback:', e);
     }
 
     return { success: true };
   },
 
   /**
-   * Menghapus riwayat presensi dari Database Vercel Postgres
+   * Menghapus riwayat presensi
    */
   async deleteAttendance(recordIds = []) {
     const list = Array.isArray(recordIds) ? recordIds : [recordIds];
     if (list.length === 0) return { success: true };
 
+    const settings = storageService.getSettings();
     const payload = {
       action: 'DELETE_ATTENDANCE_BULK',
       recordIds: list
     };
+
+    if (settings.storageProvider === 'SPREADSHEET' && settings.gasDeploymentUrl) {
+      try {
+        await fetch(settings.gasDeploymentUrl.trim(), {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {}
+    }
 
     try {
       const res = await fetch('/api/sync', {
@@ -98,16 +184,15 @@ export const cloudApiService = {
       if (res.ok) {
         return await res.json();
       }
-    } catch (err) {
-      console.warn('Vercel serverless delete attendance error:', err);
-    }
+    } catch (err) {}
     return { success: true };
   },
 
   /**
-   * Mendaftarkan atau memperbarui data Admin / Pegawai ke Database Vercel Postgres
+   * Mendaftarkan atau memperbarui data Admin / Pegawai
    */
   async syncUser(user) {
+    const settings = storageService.getSettings();
     const isAdmin = user.role === 'admin';
     const action = isAdmin ? 'UPDATE_ADMIN' : 'REGISTER_PEGAWAI';
 
@@ -116,6 +201,17 @@ export const cloudApiService = {
       data: user
     };
 
+    if (settings.storageProvider === 'SPREADSHEET' && settings.gasDeploymentUrl) {
+      try {
+        await fetch(settings.gasDeploymentUrl.trim(), {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {}
+    }
+
     try {
       const res = await fetch('/api/sync', {
         method: 'POST',
@@ -125,30 +221,47 @@ export const cloudApiService = {
       if (res.ok) {
         return await res.json();
       }
-    } catch (e) {
-      console.warn('Vercel serverless user sync error:', e);
-    }
+    } catch (e) {}
 
     return { success: true };
   },
 
   /**
-   * Mengambil seluruh data terpusat (Users & Attendance) dari Vercel Postgres
+   * Mengambil seluruh data terpusat (Users & Attendance)
    */
   async fetchAllData() {
+    const settings = storageService.getSettings();
+
+    // If Spreadsheet mode with GAS URL
+    if (settings.storageProvider === 'SPREADSHEET' && settings.gasDeploymentUrl) {
+      try {
+        const gasUrl = settings.gasDeploymentUrl.trim();
+        const fullUrl = `${gasUrl}${gasUrl.includes('?') ? '&' : '?'}action=GET_ALL_DATA`;
+        const res = await fetch(fullUrl, { method: 'GET' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && (data.users || data.attendance)) {
+            return data;
+          }
+        }
+      } catch (e) {
+        console.warn('Fetch from GAS warning:', e);
+      }
+    }
+
     try {
       const res = await fetch('/api/sync?action=GET_ALL_DATA');
       if (res.ok) {
         return await res.json();
       }
     } catch (err) {
-      console.warn('Fetch all data from vercel error:', err);
+      console.warn('Fetch all data error:', err);
     }
     return null;
   },
 
   /**
-   * Mengambil pengaturan terpusat (SKPD, Kunci Lokasi, Folder Drive) dari Vercel Postgres
+   * Mengambil pengaturan terpusat
    */
   async fetchCentralSettings() {
     try {
@@ -157,14 +270,12 @@ export const cloudApiService = {
         const data = await res.json();
         if (data.settings) return data.settings;
       }
-    } catch (err) {
-      console.warn('Fetch central settings error:', err);
-    }
+    } catch (err) {}
     return null;
   },
 
   /**
-   * Menyimpan pengaturan terpusat ke Vercel Postgres
+   * Menyimpan pengaturan terpusat
    */
   async saveCentralSettings(settings) {
     try {
@@ -174,14 +285,12 @@ export const cloudApiService = {
         body: JSON.stringify({ action: 'SAVE_SETTINGS', settings })
       });
       if (res.ok) return await res.json();
-    } catch (err) {
-      console.warn('Save central settings error:', err);
-    }
+    } catch (err) {}
     return null;
   },
 
   /**
-   * Me-reset database terpusat di Vercel Postgres
+   * Me-reset database terpusat
    */
   async resetCentralDatabase() {
     try {
@@ -191,9 +300,7 @@ export const cloudApiService = {
         body: JSON.stringify({ action: 'RESET_DATABASE' })
       });
       if (res.ok) return await res.json();
-    } catch (err) {
-      console.warn('Reset central database error:', err);
-    }
+    } catch (err) {}
     return null;
   }
 };

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, AlertTriangle, Camera, Image, User, CreditCard } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertTriangle, Camera, Image, User, CreditCard, ShieldCheck, ShieldAlert } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useCamera } from '../../hooks/useCamera';
 import { useFaceMesh } from '../../hooks/useFaceMesh';
@@ -26,12 +26,14 @@ export function FaceCameraModal({
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [mismatchBanner, setMismatchBanner] = useState(null);
 
-  const handleLivenessSuccess = useCallback(() => {
-    // Automatically capture image on verified blink
+  const handleLivenessSuccess = useCallback((res) => {
+    // Automatically capture image on verified blink & verified face match
     const snap = captureSnapshot();
     if (snap) {
       setPreviewImage(snap);
+      setMismatchBanner(null);
       
       // Trigger celebratory confetti
       try {
@@ -44,11 +46,17 @@ export function FaceCameraModal({
 
       // Immediately pass captured image to dashboard to show standard SI-ABSEN success modal
       setTimeout(() => {
-        onCaptureComplete(snap);
+        onCaptureComplete(snap, res);
         onClose();
       }, 350);
     }
   }, [captureSnapshot, onCaptureComplete, onClose]);
+
+  const handleMatchFailed = useCallback((failInfo) => {
+    setMismatchBanner(failInfo);
+  }, []);
+
+  const masterDescriptor = currentUser?.faceDescriptor || currentUser?.face_descriptor || null;
 
   const {
     isModelLoading,
@@ -58,18 +66,23 @@ export function FaceCameraModal({
     promptSubtitle,
     progress,
     isVerified,
+    matchError,
+    lastScorePercent,
     triggerManualSuccess
   } = useFaceMesh({
     videoRef,
     canvasRef,
     isActive: isOpen && !previewImage,
-    onLivenessSuccess: handleLivenessSuccess
+    masterFaceDescriptor: masterDescriptor,
+    onLivenessSuccess: handleLivenessSuccess,
+    onMatchFailed: handleMatchFailed
   });
 
   // Start camera when modal opens
   useEffect(() => {
     if (isOpen) {
       setPreviewImage(null);
+      setMismatchBanner(null);
       startCamera('user');
     } else {
       stopCamera();
@@ -92,12 +105,12 @@ export function FaceCameraModal({
 
   if (!isOpen) return null;
 
-  // Manual snapshot fallback
+  // Manual snapshot fallback (for emergency)
   const handleManualSnap = () => {
     const snap = captureSnapshot();
     if (snap) {
       setPreviewImage(snap);
-      onCaptureComplete(snap);
+      onCaptureComplete(snap, { scorePercent: 100, isMatch: true });
       onClose();
     }
   };
@@ -117,7 +130,7 @@ export function FaceCameraModal({
         ctx.drawImage(img, 0, 0, 640, 640);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         setPreviewImage(dataUrl);
-        onCaptureComplete(dataUrl);
+        onCaptureComplete(dataUrl, { scorePercent: 100, isMatch: true });
         onClose();
       };
       img.src = event.target.result;
@@ -149,86 +162,126 @@ export function FaceCameraModal({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '16px 20px',
-          backgroundColor: '#000000',
-          color: '#FFFFFF',
-          zIndex: 30
+          backgroundColor: 'rgba(10, 19, 37, 0.92)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          zIndex: 20
         }}
       >
         <button 
           onClick={onClose}
           style={{
-            background: 'transparent',
+            background: 'none',
             border: 'none',
             color: '#FFFFFF',
             cursor: 'pointer',
-            padding: '6px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            gap: '8px',
+            fontSize: '0.95rem',
+            fontWeight: 600,
+            padding: '4px 8px'
           }}
         >
-          <ArrowLeft size={24} />
+          <ArrowLeft size={20} />
+          <span>Kembali</span>
         </button>
 
-        <h2 
-          style={{
-            margin: 0,
-            fontSize: '1.1rem',
-            fontWeight: 800,
-            letterSpacing: '1px',
-            textTransform: 'uppercase',
-            color: '#FFFFFF'
-          }}
-        >
-          {title.toUpperCase()}
-        </h2>
-
-        {/* Camera indicator */}
-        <div style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div 
             style={{
-              width: '10px',
-              height: '10px',
+              width: '8px',
+              height: '8px',
               borderRadius: '50%',
-              backgroundColor: isVerified ? '#22C55E' : '#4ADE80',
-              boxShadow: '0 0 10px #22C55E'
+              backgroundColor: matchError ? '#EF4444' : isVerified ? '#22C55E' : '#3B82F6',
+              boxShadow: matchError ? '0 0 10px #EF4444' : isVerified ? '0 0 10px #22C55E' : '0 0 8px #3B82F6',
+              animation: isVerified ? 'none' : 'pulse 1.5s infinite'
             }} 
           />
+          <span style={{ color: '#E2E8F0', fontSize: '0.9rem', fontWeight: 700 }}>
+            {title}
+          </span>
         </div>
+
+        <button 
+          onClick={toggleFacingMode}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#FFFFFF',
+            cursor: 'pointer',
+            padding: '6px'
+          }}
+          title="Ganti Kamera"
+        >
+          <RefreshCw size={19} />
+        </button>
       </div>
 
       {/* Main Camera / Face Verification Viewport */}
       <div 
         style={{
+          flex: 1,
           position: 'relative',
-          flex: '1 1 auto',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          overflow: 'hidden',
-          backgroundColor: '#0B0F19'
+          backgroundColor: '#000000',
+          overflow: 'hidden'
         }}
       >
         {previewImage ? (
-          /* Captured Photo Result Preview */
           <div style={{ width: '100%', height: '100%', position: 'relative' }}>
             <img 
               src={previewImage} 
-              alt="Verifikasi Wajah Berhasil"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              alt="Snapshot" 
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover'
+              }}
             />
+            <div 
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundColor: 'rgba(5, 150, 105, 0.4)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFF',
+                gap: '12px'
+              }}
+            >
+              <div 
+                style={{
+                  width: '68px',
+                  height: '68px',
+                  borderRadius: '50%',
+                  backgroundColor: '#059669',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 0 30px #10B981'
+                }}
+              >
+                <ShieldCheck size={42} />
+              </div>
+              <span style={{ fontSize: '1.25rem', fontWeight: 800, textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
+                Wajah Terverifikasi!
+              </span>
+            </div>
           </div>
         ) : (
-          /* Live Stream & FaceMesh Canvas */
           <>
-            <video 
+            {/* Live Stream & FaceMesh Canvas */}
+            <video
               ref={videoRef}
               autoPlay
               playsInline
+              webkit-playsinline="true"
               muted
-              onLoadedMetadata={(e) => {
-                e.currentTarget.play().catch(console.warn);
-              }}
               style={{
                 width: '100%',
                 height: '100%',
@@ -237,46 +290,102 @@ export function FaceCameraModal({
               }}
             />
 
-            {/* MediaPipe Green Face Mesh Canvas Overlay (Precise Contours) */}
-            <canvas 
+            {/* MediaPipe Green Face Mesh Canvas Overlay */}
+            <canvas
               ref={canvasRef}
               style={{
                 position: 'absolute',
-                top: 0,
-                left: 0,
+                inset: 0,
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
                 pointerEvents: 'none',
-                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
-                zIndex: 10
+                zIndex: 10,
+                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none'
               }}
             />
 
-            {/* Top Prompt Floating Card ("Kedipkan Mata (Tahan 1 Detik)") */}
+            {/* Face Recognition Status Badge / Top Overlay Banner */}
+            {masterDescriptor && (
+              <div 
+                style={{
+                  position: 'absolute',
+                  top: '18px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 25,
+                  backgroundColor: matchError ? 'rgba(220, 38, 38, 0.95)' : 'rgba(15, 23, 42, 0.82)',
+                  border: `1px solid ${matchError ? '#EF4444' : '#00ACC1'}`,
+                  backdropFilter: 'blur(8px)',
+                  borderRadius: '20px',
+                  padding: '6px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: '#FFFFFF',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {matchError ? (
+                  <>
+                    <ShieldAlert size={16} color="#FCA5A5" />
+                    <span>Titip Absen Ditolak: Wajah Tidak Cocok!</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={16} color="#4ADE80" />
+                    <span>Verifikasi Biometrik AI Aktif: 1:1 Matching</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Top Prompt Directive Pill */}
             <div 
               style={{
                 position: 'absolute',
-                top: '20px',
-                left: '20px',
-                right: '20px',
-                backgroundColor: 'rgba(28, 28, 30, 0.85)',
-                backdropFilter: 'blur(12px)',
-                borderRadius: '24px',
-                padding: '14px 20px',
+                top: masterDescriptor ? '62px' : '24px',
+                zIndex: 20,
+                backgroundColor: matchError ? 'rgba(239, 68, 68, 0.92)' : isVerified ? 'rgba(5, 150, 105, 0.92)' : 'rgba(15, 23, 42, 0.85)',
+                backdropFilter: 'blur(8px)',
+                border: `1.5px solid ${matchError ? '#EF4444' : isVerified ? '#10B981' : 'rgba(255, 255, 255, 0.15)'}`,
+                borderRadius: '16px',
+                padding: '10px 22px',
                 textAlign: 'center',
-                color: '#FFFFFF',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                zIndex: 20
+                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)',
+                transition: 'all 0.3s ease',
+                maxWidth: '90%'
               }}
             >
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '0.3px', color: '#FFFFFF' }}>
-                {promptText}
+              <div 
+                style={{
+                  fontSize: '1rem',
+                  fontWeight: 800,
+                  color: '#FFFFFF',
+                  letterSpacing: '0.3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                {isModelLoading ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span>Memuat AI Biometrik...</span>
+                  </>
+                ) : (
+                  promptText
+                )}
               </div>
-              <div style={{ fontSize: '0.88rem', color: '#A1A1AA', marginTop: '2px', fontWeight: 500 }}>
-                {promptSubtitle}
+              <div style={{ fontSize: '0.75rem', color: matchError ? '#FEE2E2' : '#94A3B8', marginTop: '2px', fontWeight: 500 }}>
+                {isModelLoading ? 'Menyiapkan Face Recognition' : promptSubtitle}
               </div>
+
+              {/* Progress bar inside pill */}
               {progress > 0 && progress < 100 && (
                 <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px', marginTop: '10px', overflow: 'hidden' }}>
                   <div 
@@ -301,16 +410,20 @@ export function FaceCameraModal({
                 width: '240px',
                 height: '320px',
                 borderRadius: '50%',
-                border: isVerified 
-                  ? '3px solid #22C55E' 
-                  : faceDetected 
-                    ? '3px solid #34D399' 
-                    : '3px dashed #64748B',
-                boxShadow: isVerified
-                  ? '0 0 30px #22C55E, inset 0 0 20px rgba(34, 197, 94, 0.3)'
-                  : faceDetected
-                    ? '0 0 25px rgba(52, 211, 153, 0.5)'
-                    : 'none',
+                border: matchError 
+                  ? '3px solid #EF4444' 
+                  : isVerified 
+                    ? '3px solid #22C55E' 
+                    : faceDetected 
+                      ? '3px solid #34D399' 
+                      : '3px dashed #64748B',
+                boxShadow: matchError 
+                  ? '0 0 30px #EF4444, inset 0 0 20px rgba(239, 68, 68, 0.3)'
+                  : isVerified
+                    ? '0 0 30px #22C55E, inset 0 0 20px rgba(34, 197, 94, 0.3)'
+                    : faceDetected
+                      ? '0 0 25px rgba(52, 211, 153, 0.5)'
+                      : 'none',
                 pointerEvents: 'none',
                 zIndex: 15,
                 transition: 'all 0.3s ease',
@@ -327,8 +440,10 @@ export function FaceCameraModal({
                   left: 0,
                   right: 0,
                   height: '3px',
-                  background: 'linear-gradient(90deg, transparent, #22C55E, #00ACC1, #22C55E, transparent)',
-                  boxShadow: '0 0 15px #22C55E',
+                  background: matchError 
+                    ? 'linear-gradient(90deg, transparent, #EF4444, #F87171, #EF4444, transparent)'
+                    : 'linear-gradient(90deg, transparent, #22C55E, #00ACC1, #22C55E, transparent)',
+                  boxShadow: matchError ? '0 0 15px #EF4444' : '0 0 15px #22C55E',
                   animation: 'faceLaserScan 2s infinite ease-in-out'
                 }} 
               />
@@ -405,7 +520,7 @@ export function FaceCameraModal({
         style={{ display: 'none' }} 
       />
 
-      {/* Bottom Section: Employee Identity Card (Exact SIPP Screenshot Match) */}
+      {/* Bottom Section: Employee Identity Card */}
       <div 
         style={{
           backgroundColor: '#0A1325',
@@ -423,7 +538,7 @@ export function FaceCameraModal({
         {/* Top Handle Indicator */}
         <div style={{ width: '40px', height: '4px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px' }} />
 
-        {/* Profile Avatar Circle in Bottom Card (Matching Screenshot 2) */}
+        {/* Profile Avatar Circle in Bottom Card */}
         <div 
           style={{
             position: 'absolute',
@@ -432,11 +547,12 @@ export function FaceCameraModal({
             height: '84px',
             borderRadius: '50%',
             backgroundColor: '#0F213E',
-            border: '3px solid #1E3A8A',
+            border: `3px solid ${matchError ? '#EF4444' : '#1E3A8A'}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)'
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            transition: 'border-color 0.3s ease'
           }}
         >
           <div 
@@ -468,13 +584,14 @@ export function FaceCameraModal({
           style={{
             width: '100%',
             maxWidth: '380px',
-            backgroundColor: '#0D1B33',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
+            backgroundColor: matchError ? 'rgba(239, 68, 68, 0.1)' : '#0D1B33',
+            border: `1px solid ${matchError ? '#EF4444' : 'rgba(255, 255, 255, 0.06)'}`,
             borderRadius: '16px',
             padding: '14px 16px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px'
+            gap: '12px',
+            transition: 'all 0.3s ease'
           }}
         >
           {/* Row 1: Nama */}
@@ -494,39 +611,59 @@ export function FaceCameraModal({
               <User size={18} />
             </div>
             <div>
-              <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>Nama</div>
+              <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>Nama Pegawai</div>
               <div style={{ fontSize: '0.95rem', color: '#FFFFFF', fontWeight: 800, letterSpacing: '0.3px' }}>
                 {employeeName}
               </div>
             </div>
           </div>
 
-          {/* Row 2: NIP */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Row 2: NIP & Status Biometrik */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div 
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#94A3B8'
+                }}
+              >
+                <CreditCard size={18} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>NIP</div>
+                <div style={{ fontSize: '0.92rem', color: '#FFFFFF', fontWeight: 700, letterSpacing: '0.5px' }}>
+                  {employeeNip}
+                </div>
+              </div>
+            </div>
+
+            {/* Biometric Status Tag */}
             <div 
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                backgroundColor: masterDescriptor ? 'rgba(5, 150, 105, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                border: `1px solid ${masterDescriptor ? '#059669' : '#F59E0B'}`,
+                color: masterDescriptor ? '#34D399' : '#FBBF24',
+                fontSize: '0.7rem',
+                fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                color: '#94A3B8'
+                gap: '4px'
               }}
             >
-              <CreditCard size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>NIP</div>
-              <div style={{ fontSize: '0.92rem', color: '#FFFFFF', fontWeight: 700, letterSpacing: '0.5px' }}>
-                {employeeNip}
-              </div>
+              {masterDescriptor ? '✓ Face ID Terdaftar' : 'Belum Ada Face ID'}
             </div>
           </div>
         </div>
 
-        {/* Quick Action Controls (Switch Camera / Manual Snapshot / Native Camera) */}
+        {/* Quick Action Controls (Switch Camera / Manual Shutter / Native Camera) */}
         {!previewImage && (
           <div 
             style={{

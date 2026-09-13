@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
 import { 
   Users, CheckCircle2, AlertTriangle, Clock, Calendar, 
   Download, Search, Filter, RefreshCw, ExternalLink, 
   Settings, ShieldCheck, FileSpreadsheet, Eye, 
   Table, LayoutGrid, Check, X as CloseIcon, Layers, Sun, Moon, Sunset, LogOut, MapPin, Building2,
-  Folder, FolderTree, HardDrive, Cloud, Database, Copy, Trash2, CheckSquare, Square
+  Folder, FolderTree, HardDrive, Cloud, Database, Copy, Trash2, CheckSquare, Square, Code, FileText
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAttendance } from '../../contexts/AttendanceContext';
@@ -18,6 +17,7 @@ import { AdminForceSetupModal } from '../../components/admin/AdminForceSetupModa
 import { rustfsService } from '../../services/rustfsService';
 import { cloudApiService } from '../../services/cloudApi';
 import { storageService } from '../../services/storage';
+import { GAS_CODE_TEMPLATE } from '../../utils/gasTemplate';
 
 const MONTH_OPTIONS = [
   { value: 0, label: 'Januari' },
@@ -146,8 +146,13 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
 
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Dual Storage Mode: 'GOOGLE' (Vercel Postgres & Google Drive) vs 'SERVER' (Dedicated RustFS Storage Server)
-  const [storageProviderInput, setStorageProviderInput] = useState(settings?.storageProvider || 'GOOGLE');
+  // Multi-Engine Storage Mode: 'SPREADSHEET' (Google Spreadsheet & Drive via GAS) vs 'GOOGLE' (Vercel Postgres & Google Drive) vs 'SERVER' (Dedicated RustFS Storage Server)
+  const [storageProviderInput, setStorageProviderInput] = useState(settings?.storageProvider || 'SPREADSHEET');
+  const [gasDeploymentUrlInput, setGasDeploymentUrlInput] = useState(settings?.gasDeploymentUrl || '');
+  const [testingGas, setTestingGas] = useState(false);
+  const [showGasCodeModal, setShowGasCodeModal] = useState(false);
+  const [copiedGas, setCopiedGas] = useState(false);
+
   const [googleDriveFolderUrlInput, setGoogleDriveFolderUrlInput] = useState(settings?.googleDriveFolderUrl || '');
   const [testingGoogleCloud, setTestingGoogleCloud] = useState(false);
 
@@ -1978,30 +1983,99 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
               </div>
             </div>
 
-            {/* CARD 2: KONFIGURASI CLOUD DATABASE (VERCEL POSTGRES) & PENYIMPANAN FOTO (GOOGLE DRIVE / RUSTFS) */}
+            {/* CARD 2: KONFIGURASI MULTI-ENGINE DATABASE & PENYIMPANAN FOTO */}
             <div className="table-card" style={{ padding: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <div style={{ width: '42px', height: '42px', borderRadius: '12px', backgroundColor: storageProviderInput === 'GOOGLE' ? '#ECFDF5' : '#F3E8FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: storageProviderInput === 'GOOGLE' ? '#059669' : '#7C3AED', transition: 'all 0.3s ease' }}>
-                  {storageProviderInput === 'GOOGLE' ? <Database size={24} /> : <HardDrive size={24} />}
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  backgroundColor: storageProviderInput === 'SPREADSHEET' ? '#EFF6FF' : storageProviderInput === 'GOOGLE' ? '#ECFDF5' : '#F3E8FF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: storageProviderInput === 'SPREADSHEET' ? '#2563EB' : storageProviderInput === 'GOOGLE' ? '#059669' : '#7C3AED',
+                  transition: 'all 0.3s ease'
+                }}>
+                  {storageProviderInput === 'SPREADSHEET' ? <FileSpreadsheet size={24} /> : storageProviderInput === 'GOOGLE' ? <Database size={24} /> : <HardDrive size={24} />}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: storageProviderInput === 'GOOGLE' ? '#059669' : '#7C3AED', margin: 0, transition: 'color 0.3s ease' }}>
+                  <h3 style={{
+                    fontSize: '1.2rem',
+                    fontWeight: 800,
+                    color: storageProviderInput === 'SPREADSHEET' ? '#2563EB' : storageProviderInput === 'GOOGLE' ? '#059669' : '#7C3AED',
+                    margin: 0,
+                    transition: 'color 0.3s ease'
+                  }}>
                     2. Konfigurasi Cloud Database & Penyimpanan Foto Bukti Presensi
                   </h3>
                   <p style={{ fontSize: '0.82rem', color: '#64748B', margin: 0 }}>
-                    Penyimpanan data akun & riwayat presensi: <strong>Vercel Postgres (Neon)</strong> dan penyimpanan foto bukti: <strong>Google Drive / RustFS</strong>.
+                    Pilih mesin database untuk akun & presensi: <strong>Google Spreadsheet (GAS)</strong>, <strong>Vercel Postgres (Neon)</strong>, atau <strong>Dedicated Server (RustFS)</strong>.
                   </p>
                 </div>
               </div>
 
-              {/* DUAL STORAGE TOGGLE SELECTOR */}
+              {/* TRIPLE STORAGE TOGGLE SELECTOR */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
                 gap: '14px',
                 marginBottom: '22px'
               }}>
-                {/* Opsi 1: Vercel Postgres & Google Drive */}
+                {/* Opsi 1: Google Spreadsheet & Google Drive (via GAS) */}
+                <div
+                  onClick={() => {
+                    setStorageProviderInput('SPREADSHEET');
+                    updateSettings({
+                      ...settings,
+                      storageProvider: 'SPREADSHEET'
+                    });
+                    showSuccess('Mode penyimpanan aktif: Google Spreadsheet & Google Drive (via GAS)!');
+                  }}
+                  style={{
+                    padding: '16px 18px',
+                    borderRadius: '14px',
+                    border: `2px solid ${storageProviderInput === 'SPREADSHEET' ? '#2563EB' : '#E2E8F0'}`,
+                    backgroundColor: storageProviderInput === 'SPREADSHEET' ? '#EFF6FF' : '#FFFFFF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    boxShadow: storageProviderInput === 'SPREADSHEET' ? '0 4px 14px rgba(37, 99, 235, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)',
+                    transition: 'all 0.25s ease'
+                  }}
+                >
+                  <div style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '12px',
+                    backgroundColor: storageProviderInput === 'SPREADSHEET' ? '#2563EB' : '#F1F5F9',
+                    color: storageProviderInput === 'SPREADSHEET' ? '#FFFFFF' : '#64748B',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <FileSpreadsheet size={24} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ fontSize: '0.98rem', fontWeight: 800, color: storageProviderInput === 'SPREADSHEET' ? '#1E40AF' : '#1E293B' }}>
+                        📊 Google Spreadsheet
+                      </span>
+                      {storageProviderInput === 'SPREADSHEET' && (
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', backgroundColor: '#BFDBFE', color: '#1E40AF' }}>
+                          AKTIF
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: storageProviderInput === 'SPREADSHEET' ? '#1D4ED8' : '#64748B', lineHeight: 1.35 }}>
+                      100% Gratis via Apps Script (GAS). Data langsung masuk ke Google Sheet & Drive.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Opsi 2: Vercel Postgres & Google Drive */}
                 <div
                   onClick={() => {
                     setStorageProviderInput('GOOGLE');
@@ -2040,7 +2114,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                       <span style={{ fontSize: '0.98rem', fontWeight: 800, color: storageProviderInput === 'GOOGLE' ? '#065F46' : '#1E293B' }}>
-                        🌐 Vercel Postgres & Google Drive
+                        🌐 Vercel Postgres
                       </span>
                       {storageProviderInput === 'GOOGLE' && (
                         <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', backgroundColor: '#A7F3D0', color: '#065F46' }}>
@@ -2049,12 +2123,12 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                       )}
                     </div>
                     <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: storageProviderInput === 'GOOGLE' ? '#047857' : '#64748B', lineHeight: 1.35 }}>
-                      Database cloud permanen Neon Postgres untuk akun & presensi. Foto bukti presensi tersimpan di Google Drive.
+                      Database cloud permanen Neon Postgres (SQL) untuk performa tinggi & foto di Google Drive.
                     </p>
                   </div>
                 </div>
 
-                {/* Opsi 2: Server Storage (RustFS) */}
+                {/* Opsi 3: Server Storage (RustFS) */}
                 <div
                   onClick={() => {
                     setStorageProviderInput('SERVER');
@@ -2093,7 +2167,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                       <span style={{ fontSize: '0.98rem', fontWeight: 800, color: storageProviderInput === 'SERVER' ? '#581C87' : '#1E293B' }}>
-                        🖥️ Dedicated Server Storage
+                        🖥️ Dedicated Server
                       </span>
                       {storageProviderInput === 'SERVER' && (
                         <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '12px', backgroundColor: '#DDD6FE', color: '#581C87' }}>
@@ -2102,48 +2176,47 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                       )}
                     </div>
                     <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: storageProviderInput === 'SERVER' ? '#6B21A8' : '#64748B', lineHeight: 1.35 }}>
-                      Simpan file foto bukti langsung ke server penyimpanan RustFS terdistribusi mandiri berkecepatan tinggi.
+                      Simpan file foto bukti langsung ke server penyimpanan RustFS / VPS mandiri.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* PANEL 1: PENGATURAN VERCEL POSTGRES & GOOGLE DRIVE STORAGE */}
-              {storageProviderInput === 'GOOGLE' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', background: '#F8FAFC', padding: '20px', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
+              {/* PANEL 1: PENGATURAN GOOGLE SPREADSHEET & APPS SCRIPT (GAS) */}
+              {storageProviderInput === 'SPREADSHEET' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', background: '#F0F9FF', padding: '20px', borderRadius: '14px', border: '1px solid #BAE6FD' }}>
                   
                   {/* Status Banner */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#ECFDF5', padding: '12px 16px', borderRadius: '10px', border: '1px solid #A7F3D0' }}>
-                    <CheckCircle2 size={20} color="#059669" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#E0F2FE', padding: '12px 16px', borderRadius: '10px', border: '1px solid #7DD3FC' }}>
+                    <FileSpreadsheet size={20} color="#0284C7" />
                     <div>
-                      <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#065F46' }}>
-                        Mode Aktif: Vercel Postgres (Neon) & Google Drive Storage
+                      <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0369A1' }}>
+                        Mode Aktif: Google Spreadsheet & Google Drive (via Google Apps Script - 100% Gratis)
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#047857' }}>
-                        Seluruh akun pegawai, riwayat presensi masuk/pulang, shift, dan rekap disinkronkan langsung ke database cloud PostgreSQL. Foto bukti otomatis disimpan ke Google Drive.
+                      <div style={{ fontSize: '0.78rem', color: '#075985' }}>
+                        Seluruh akun pegawai, riwayat presensi masuk/pulang, shift, dan rekap disinkronkan langsung ke Google Sheets. Foto bukti otomatis disimpan ke Google Drive.
                       </div>
                     </div>
                   </div>
 
                   {/* Form Inputs Grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-                    {/* Status Database Postgres */}
-                    <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: '10px', border: '1.5px solid #CBD5E1', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      <div>
-                        <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                          <Database size={16} color="#059669" />
-                          <span>Database Cloud Utama: <strong>Vercel Postgres (Neon)</strong></span>
-                        </label>
-                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748B', lineHeight: 1.4 }}>
-                          Tersambung langsung via serverless environment variable <code>POSTGRES_URL</code>. Tabel <code>users</code>, <code>attendance</code>, dan <code>settings</code> terkelola otomatis.
-                        </p>
-                      </div>
-                      <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', backgroundColor: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }}></span>
-                          Terkoneksi Otomatis
-                        </span>
-                      </div>
+                    {/* URL Google Apps Script Web App */}
+                    <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: '10px', border: '1.5px solid #CBD5E1' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                        <Code size={16} color="#0284C7" />
+                        <span>URL Web App Google Apps Script (GAS Deployment URL)</span>
+                      </label>
+                      <input
+                        type="url"
+                        placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
+                        value={gasDeploymentUrlInput}
+                        onChange={(e) => setGasDeploymentUrlInput(e.target.value)}
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
+                      />
+                      <span style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '4px', display: 'block' }}>
+                        Didapat setelah Deploy Web App di Apps Script (Akses: <em>Siapa Saja / Anyone</em>).
+                      </span>
                     </div>
 
                     {/* Link Folder Google Drive */}
@@ -2165,19 +2238,6 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                     </div>
                   </div>
 
-                  {/* Vercel Serverless Information Alert */}
-                  <div style={{ backgroundColor: '#ECFDF5', border: '1.5px solid #A7F3D0', padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <Cloud size={24} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div>
-                      <h4 style={{ margin: '0 0 4px', fontSize: '0.9rem', fontWeight: 800, color: '#065F46' }}>
-                        ✅ Backend Vercel Serverless & Postgres Aktif (Bebas Apps Script & Bebas Lemot)
-                      </h4>
-                      <p style={{ margin: 0, fontSize: '0.8rem', color: '#047857', lineHeight: 1.5 }}>
-                        Integrasi database cloud dikelola langsung oleh Vercel API (<code>/api/sync</code>) menggunakan driver Neon Serverless. Untuk mengunduh laporan multi-sheet kapan saja, gunakan tombol <strong>"Unduh Excel Rekap"</strong> di tab Riwayat Presensi.
-                      </p>
-                    </div>
-                  </div>
-
                   {/* Action Buttons */}
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '6px' }}>
                     <button
@@ -2185,17 +2245,18 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                       onClick={async () => {
                         const newSettings = {
                           ...settings,
-                          storageProvider: 'GOOGLE',
+                          storageProvider: 'SPREADSHEET',
+                          gasDeploymentUrl: gasDeploymentUrlInput.trim(),
                           googleDriveFolderUrl: googleDriveFolderUrlInput.trim()
                         };
                         updateSettings(newSettings);
                         await cloudApiService.saveCentralSettings(newSettings);
-                        showSuccess('Konfigurasi Cloud Storage & Database berhasil disimpan!');
+                        showSuccess('Konfigurasi Google Spreadsheet & Drive berhasil disimpan!');
                         if (refreshUsersFromCloud) refreshUsersFromCloud();
                         if (refreshAttendanceFromCloud) refreshAttendanceFromCloud();
                       }}
                       style={{
-                        backgroundColor: '#059669',
+                        backgroundColor: '#0284C7',
                         color: '#FFFFFF',
                         border: 'none',
                         borderRadius: '8px',
@@ -2203,36 +2264,36 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                         fontWeight: 800,
                         fontSize: '0.9rem',
                         cursor: 'pointer',
-                        boxShadow: '0 3px 10px rgba(5, 150, 105, 0.25)'
+                        boxShadow: '0 3px 10px rgba(2, 132, 199, 0.25)'
                       }}
                     >
-                      Simpan Konfigurasi Storage
+                      Simpan Konfigurasi Spreadsheet
                     </button>
 
                     <button
                       type="button"
                       onClick={async () => {
-                        setTestingGoogleCloud(true);
+                        setTestingGas(true);
                         try {
-                          const res = await cloudApiService.testGoogleIntegration(
-                            '',
+                          const res = await cloudApiService.testGasIntegration(
+                            gasDeploymentUrlInput.trim(),
                             googleDriveFolderUrlInput.trim()
                           );
                           if (res.success) {
-                            showSuccess(res.message, 'UJI KONEKSI DATABASE BERHASIL');
+                            showSuccess(res.message, 'UJI KONEKSI BERHASIL');
                           } else {
-                            showError(res.message, 'UJI KONEKSI DATABASE GAGAL');
+                            showError(res.message, 'UJI KONEKSI GAGAL');
                           }
                         } catch (err) {
                           showError(`Koneksi gagal: ${err.message}`, 'KONEKSI GAGAL');
                         } finally {
-                          setTestingGoogleCloud(false);
+                          setTestingGas(false);
                         }
                       }}
                       style={{
-                        backgroundColor: '#ECFDF5',
-                        color: '#059669',
-                        border: '1px solid #A7F3D0',
+                        backgroundColor: '#E0F2FE',
+                        color: '#0369A1',
+                        border: '1px solid #BAE6FD',
                         borderRadius: '8px',
                         padding: '11px 18px',
                         fontWeight: 700,
@@ -2240,13 +2301,34 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                         cursor: 'pointer'
                       }}
                     >
-                      {testingGoogleCloud ? 'Menguji Database...' : '🧪 Uji Koneksi Vercel Postgres & Drive'}
+                      {testingGas ? 'Menguji Koneksi...' : '⚡ Test Koneksi Spreadsheet & GAS'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowGasCodeModal(true)}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        color: '#334155',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '8px',
+                        padding: '11px 18px',
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Code size={16} color="#0284C7" />
+                      <span>Salin Template Kode Apps Script (Code.gs)</span>
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* PANEL 2: PENGATURAN DEDICATED SERVER RUSTFS */}
+              {/* PANEL 3: PENGATURAN DEDICATED SERVER RUSTFS */}
               {storageProviderInput === 'SERVER' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', background: '#FAF5FF', padding: '20px', borderRadius: '14px', border: '1px solid #E9D5FF' }}>
                   
@@ -2462,6 +2544,139 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
         isOpen={showAdminProfileModal} 
         onClose={() => setShowAdminProfileModal(false)} 
       />
+
+      {/* MODAL SALIN TEMPLATE GOOGLE APPS SCRIPT (GAS) */}
+      {showGasCodeModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            zIndex: 9999
+          }}
+        >
+          <div 
+            className="auth-card-animate"
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '680px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                  <Code size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1E293B', margin: 0 }}>
+                    Template Kode Google Apps Script (Code.gs)
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: '#64748B', margin: 0 }}>
+                    Backend gratis untuk Google Spreadsheet & Google Drive
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowGasCodeModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '6px' }}
+              >
+                <CloseIcon size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body & Instructions */}
+            <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', padding: '12px 16px', borderRadius: '10px', fontSize: '0.82rem', color: '#166534', lineHeight: 1.5 }}>
+                <strong>🚀 3 Langkah Mudah Mengaktifkan:</strong>
+                <ol style={{ margin: '6px 0 0', paddingLeft: '20px' }}>
+                  <li>Buka Google Spreadsheet baru, klik menu <strong>Ekstensi &gt; Apps Script</strong>.</li>
+                  <li>Hapus kode bawaan, lalu <strong>Paste</strong> seluruh kode di bawah ini.</li>
+                  <li>Klik <strong>Deploy &gt; New deployment &gt; Web App</strong> (Set: <em>Execute as Me</em>, <em>Who has access: Anyone</em>), lalu salin URL-nya ke SI-ABSEN.</li>
+                </ol>
+              </div>
+
+              <div style={{ position: 'relative' }}>
+                <pre
+                  style={{
+                    backgroundColor: '#0F172A',
+                    color: '#E2E8F0',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    fontSize: '0.76rem',
+                    fontFamily: 'monospace',
+                    height: '280px',
+                    overflowY: 'auto',
+                    margin: 0
+                  }}
+                >
+                  {GAS_CODE_TEMPLATE}
+                </pre>
+
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(GAS_CODE_TEMPLATE);
+                    setCopiedGas(true);
+                    showSuccess('Kode Apps Script berhasil disalin ke clipboard!');
+                    setTimeout(() => setCopiedGas(false), 2500);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                    backgroundColor: copiedGas ? '#059669' : '#2563EB',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 14px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  {copiedGas ? <><Check size={14} /> Tersalin!</> : <><Copy size={14} /> Salin Semua Kode</>}
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '14px 24px', borderTop: '1px solid #E2E8F0', backgroundColor: '#F8FAFC', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => setShowGasCodeModal(false)}
+                style={{
+                  backgroundColor: '#00838F',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '10px 20px',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Tutup Panduan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

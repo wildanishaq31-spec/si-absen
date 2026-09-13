@@ -58,10 +58,16 @@ async function ensureTables(sql) {
         nip VARCHAR(64),
         skpd VARCHAR(255),
         photo TEXT,
+        face_descriptor TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         last_login TIMESTAMPTZ
       );
     `;
+
+    // Ensure face_descriptor column exists for existing tables
+    try {
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS face_descriptor TEXT;`;
+    } catch (e) {}
 
     await sql`
       CREATE TABLE IF NOT EXISTS attendance (
@@ -342,8 +348,12 @@ export default async function handler(req, res) {
         // PostgreSQL Update
         if (sql) {
           try {
+            const faceDescStr = user.faceDescriptor 
+              ? (typeof user.faceDescriptor === 'string' ? user.faceDescriptor : JSON.stringify(user.faceDescriptor))
+              : (user.face_descriptor ? (typeof user.face_descriptor === 'string' ? user.face_descriptor : JSON.stringify(user.face_descriptor)) : null);
+
             await sql`
-              INSERT INTO users (id, name, email, password, role, nip, skpd, photo, last_login)
+              INSERT INTO users (id, name, email, password, role, nip, skpd, photo, face_descriptor, last_login)
               VALUES (
                 ${user.id || `U-${Date.now()}`},
                 ${user.name || 'User'},
@@ -353,6 +363,7 @@ export default async function handler(req, res) {
                 ${user.nip || null},
                 ${user.skpd || null},
                 ${user.photo || null},
+                ${faceDescStr},
                 ${user.lastLogin ? new Date(user.lastLogin) : null}
               )
               ON CONFLICT (id) DO UPDATE SET
@@ -363,6 +374,7 @@ export default async function handler(req, res) {
                 nip = COALESCE(EXCLUDED.nip, users.nip),
                 skpd = COALESCE(EXCLUDED.skpd, users.skpd),
                 photo = COALESCE(EXCLUDED.photo, users.photo),
+                face_descriptor = COALESCE(EXCLUDED.face_descriptor, users.face_descriptor),
                 last_login = COALESCE(EXCLUDED.last_login, users.last_login)
             `;
           } catch (err) {
@@ -389,18 +401,30 @@ export default async function handler(req, res) {
         try {
           const pgUsers = await sql`SELECT * FROM users ORDER BY created_at ASC`;
           if (pgUsers && pgUsers.length > 0) {
-            finalUsers = pgUsers.map(u => ({
-              id: u.id,
-              name: u.name,
-              email: u.email,
-              password: u.password,
-              role: u.role,
-              nip: u.nip,
-              skpd: u.skpd,
-              photo: u.photo,
-              lastLogin: u.last_login ? new Date(u.last_login).toISOString() : null,
-              createdAt: u.created_at ? new Date(u.created_at).toISOString() : null
-            }));
+            finalUsers = pgUsers.map(u => {
+              let parsedFaceDesc = null;
+              if (u.face_descriptor) {
+                try {
+                  parsedFaceDesc = typeof u.face_descriptor === 'string' ? JSON.parse(u.face_descriptor) : u.face_descriptor;
+                } catch (e) {
+                  parsedFaceDesc = u.face_descriptor;
+                }
+              }
+              return {
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                password: u.password,
+                role: u.role,
+                nip: u.nip,
+                skpd: u.skpd,
+                photo: u.photo,
+                faceDescriptor: parsedFaceDesc,
+                face_descriptor: parsedFaceDesc,
+                lastLogin: u.last_login ? new Date(u.last_login).toISOString() : null,
+                createdAt: u.created_at ? new Date(u.created_at).toISOString() : null
+              };
+            });
             memoryUsers = finalUsers;
           }
 

@@ -172,16 +172,16 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
                 <div className="presence-columns">
                   {/* Kolom Masuk */}
                   <div className="presence-item">
-                    <div className="presence-icon-box masuk">
+                    <div className="presence-icon-box masuk" style={{ backgroundColor: todayCheckIn?.type === 'Dinas Luar' ? '#FEF3C7' : undefined, color: todayCheckIn?.type === 'Dinas Luar' ? '#D97706' : undefined }}>
                       <LogIn size={22} strokeWidth={2.5} />
                     </div>
                     <div className="presence-details">
-                      <span className="presence-type-label">Masuk</span>
+                      <span className="presence-type-label">{todayCheckIn?.type === 'Dinas Luar' ? 'Dinas Luar' : 'Masuk'}</span>
                       <span className="presence-time" style={{ color: todayCheckIn ? '#0F172A' : '#94A3B8' }}>
                         {todayCheckIn ? todayCheckIn.time : '-- : --'}
                       </span>
-                      <span className="presence-tag">
-                        {todayCheckIn ? (todayCheckIn.isLate ? todayCheckIn.status : (todayCheckIn.type || 'MASUK')) : '-'}
+                      <span className="presence-tag" style={{ color: todayCheckIn?.type === 'Dinas Luar' ? '#D97706' : undefined }}>
+                        {todayCheckIn ? (todayCheckIn.type === 'Dinas Luar' ? 'DINAS LUAR (HADIR)' : (todayCheckIn.isLate ? todayCheckIn.status : (todayCheckIn.type || 'MASUK'))) : '-'}
                       </span>
                     </div>
                   </div>
@@ -190,16 +190,16 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
 
                   {/* Kolom Pulang */}
                   <div className="presence-item">
-                    <div className="presence-icon-box pulang">
+                    <div className="presence-icon-box pulang" style={{ backgroundColor: todayCheckIn?.type === 'Dinas Luar' ? '#ECFDF5' : undefined, color: todayCheckIn?.type === 'Dinas Luar' ? '#059669' : undefined }}>
                       <LogOut size={22} strokeWidth={2.5} />
                     </div>
                     <div className="presence-details">
                       <span className="presence-type-label">Pulang</span>
-                      <span className="presence-time" style={{ color: todayCheckOut ? '#0F172A' : '#94A3B8' }}>
-                        {todayCheckOut ? todayCheckOut.time : '-- : --'}
+                      <span className="presence-time" style={{ color: (todayCheckOut || todayCheckIn?.type === 'Dinas Luar') ? '#0F172A' : '#94A3B8' }}>
+                        {todayCheckIn?.type === 'Dinas Luar' ? 'Tuntas 1x' : (todayCheckOut ? todayCheckOut.time : '-- : --')}
                       </span>
-                      <span className="presence-tag">
-                        {todayCheckOut ? todayCheckOut.status : '-'}
+                      <span className="presence-tag" style={{ color: todayCheckIn?.type === 'Dinas Luar' ? '#059669' : undefined }}>
+                        {todayCheckIn?.type === 'Dinas Luar' ? 'BEBAS PULANG' : (todayCheckOut ? todayCheckOut.status : '-')}
                       </span>
                     </div>
                   </div>
@@ -256,7 +256,9 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
         onClose={() => setShowFaceCamera(false)}
         onCaptureComplete={handleCameraCaptureComplete}
         title={
-          attendanceCategory === 'SHIFT'
+          attendanceCategory === 'DINAS_LUAR'
+            ? 'Verifikasi Wajah Presensi Dinas Luar'
+            : attendanceCategory === 'SHIFT'
             ? (cameraMode === 'MASUK' 
                 ? `Verifikasi Wajah Shift Masuk (${activeShiftType === 'PAGI' ? 'Pagi' : activeShiftType === 'SORE' ? 'Sore' : 'Malam'})`
                 : `Verifikasi Wajah Shift Pulang (${activeShiftType === 'PAGI' ? 'Pagi' : activeShiftType === 'SORE' ? 'Sore' : 'Malam'})`)

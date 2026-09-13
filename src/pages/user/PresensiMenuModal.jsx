@@ -90,13 +90,13 @@ export function PresensiMenuModal({
                 className="menu-item-card"
                 onClick={() => {
                   handleCloseAll();
-                  onSelectLeave('Dinas Luar');
+                  onSelectMasuk('Dinas Luar', 'DINAS_LUAR');
                 }}
               >
-                <div className="menu-icon-wrapper" style={{ backgroundColor: '#FEF3C7', color: '#D97706' }}>
+                <div className="menu-icon-wrapper" style={{ backgroundColor: '#FEF3C7', color: '#D97706', border: '1.5px solid #FDE68A' }}>
                   <Plane size={28} />
                 </div>
-                <span className="menu-label">Dinas Luar</span>
+                <span className="menu-label" style={{ fontWeight: 800, color: '#B45309' }}>Dinas Luar</span>
               </div>
 
               {/* 5. Izin / Sakit / Cuti */}

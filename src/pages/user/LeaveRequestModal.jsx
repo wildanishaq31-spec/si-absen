@@ -70,8 +70,8 @@ export function LeaveRequestModal({ isOpen, onClose, initialType = 'Izin' }) {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#00838F' }}>Pengajuan Ketidakhadiran</h3>
-            <p style={{ fontSize: '0.8rem', color: '#64748B' }}>Izin, Cuti, Sakit, atau Dinas Luar</p>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#00838F' }}>Pengajuan Izin, Sakit & Cuti</h3>
+            <p style={{ fontSize: '0.8rem', color: '#64748B' }}>Permohonan izin tidak hadir, cuti tahunan, atau surat dokter</p>
           </div>
           <button 
             onClick={onClose}
@@ -85,10 +85,10 @@ export function LeaveRequestModal({ isOpen, onClose, initialType = 'Izin' }) {
           {/* Tipe Izin */}
           <div>
             <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
-              Jenis Kehadiran / Surat
+              Jenis Pengajuan / Surat
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-              {['Izin', 'Sakit', 'Cuti', 'Dinas Luar'].map(t => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+              {['Izin', 'Sakit', 'Cuti'].map(t => (
                 <button
                   key={t}
                   type="button"

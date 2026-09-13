@@ -151,12 +151,13 @@ export function AttendanceProvider({ children }) {
     r => currentUser && (r.email === currentUser.email || r.userName === currentUser.name) && r.date === todayStr
   );
 
-  const isCheckInType = (t) => ['Masuk', 'HARIAN_MASUK', 'Shift Masuk', 'SHIFT_MASUK', 'D3 Masuk', 'D3', 'D3_MASUK'].includes(t) || t?.toLowerCase().includes('masuk');
+  const isCheckInType = (t) => ['Masuk', 'HARIAN_MASUK', 'Shift Masuk', 'SHIFT_MASUK', 'D3 Masuk', 'D3', 'D3_MASUK', 'Dinas Luar'].includes(t) || t?.toLowerCase().includes('masuk');
   const isCheckOutType = (t) => ['Pulang', 'HARIAN_PULANG', 'Shift Pulang', 'SHIFT_PULANG', 'D3 Pulang', 'D3_PULANG'].includes(t) || t?.toLowerCase().includes('pulang');
 
   const todayCheckIn = userTodayRecords.find(r => isCheckInType(r.type));
   const todayCheckOut = userTodayRecords.find(r => isCheckOutType(r.type));
-  const todayLeave = userTodayRecords.find(r => ['Izin', 'Sakit', 'Cuti', 'Dinas Luar'].includes(r.type));
+  const todayDinasLuar = userTodayRecords.find(r => r.type === 'Dinas Luar');
+  const todayLeave = userTodayRecords.find(r => ['Izin', 'Sakit', 'Cuti'].includes(r.type));
 
   /**
    * Helper to upload photo to RustFS (Mode Server) or generate Google Drive link
@@ -194,7 +195,7 @@ export function AttendanceProvider({ children }) {
   };
 
   /**
-   * Submit Check-in (Masuk / Shift Masuk / D3 Masuk)
+   * Submit Check-in (Masuk / Shift Masuk / D3 Masuk / Dinas Luar)
    */
   const doCheckIn = async ({ 
     evidenceDataUrl, 
@@ -207,9 +208,13 @@ export function AttendanceProvider({ children }) {
   }) => {
     if (!currentUser) return { success: false, message: 'Harap login terlebih dahulu.' };
 
-    // Strict Location Lock Check
-    if (settings.strictLocationLock && !isInRadius && distanceMeters > (settings.officeRadiusMeters || 100)) {
-      showToast(`Gagal Absen! Anda berada di luar radius kantor (${distanceMeters} meter dari titik lokasi yang dikunci). Harap mendekat ke kantor atau ajukan Dinas Luar.`, 'error');
+    const isShift = category === 'SHIFT' || Boolean(shiftType);
+    const isD3 = category === 'D3' || type === 'D3 Masuk' || type === 'D3';
+    const isDinasLuar = category === 'DINAS_LUAR' || type === 'Dinas Luar';
+
+    // Strict Location Lock Check (Bypass for Dinas Luar because official duty is performed outside office)
+    if (!isDinasLuar && settings.strictLocationLock && !isInRadius && distanceMeters > (settings.officeRadiusMeters || 100)) {
+      showToast(`Gagal Absen! Anda berada di luar radius kantor (${distanceMeters} meter dari titik lokasi yang dikunci). Harap mendekat ke kantor atau lakukan Absen Dinas Luar.`, 'error');
       return { success: false, message: 'Di luar radius lokasi yang dikunci.' };
     }
 
@@ -218,22 +223,22 @@ export function AttendanceProvider({ children }) {
     const timeStr = formatTimeHMS(now);
     
     let evaluation;
-    const isShift = category === 'SHIFT' || Boolean(shiftType);
-    const isD3 = category === 'D3' || type === 'D3 Masuk' || type === 'D3';
     
     if (isShift) {
       evaluation = evaluateShiftCheckIn(timeStr, shiftType || 'PAGI', now);
+    } else if (isDinasLuar) {
+      evaluation = { status: 'Hadir (Dinas Luar)', isLate: false };
     } else {
       evaluation = evaluateCheckIn(timeStr, now);
     }
 
-    const recordType = isShift ? 'Shift Masuk' : (isD3 ? 'D3 Masuk' : (type || 'Masuk'));
-    const recordCategory = isShift ? 'SHIFT' : (isD3 ? 'D3' : 'HARIAN');
-    const shiftLabel = isShift ? (shiftType === 'PAGI' ? 'Shift Pagi' : shiftType === 'SORE' ? 'Shift Sore' : 'Shift Malam') : (isD3 ? 'D3' : null);
+    const recordType = isShift ? 'Shift Masuk' : (isD3 ? 'D3 Masuk' : (isDinasLuar ? 'Dinas Luar' : (type || 'Masuk')));
+    const recordCategory = isShift ? 'SHIFT' : (isD3 ? 'D3' : (isDinasLuar ? 'DINAS_LUAR' : 'HARIAN'));
+    const shiftLabel = isShift ? (shiftType === 'PAGI' ? 'Shift Pagi' : shiftType === 'SORE' ? 'Shift Sore' : 'Shift Malam') : (isD3 ? 'D3' : (isDinasLuar ? 'Dinas Luar' : null));
     const compositeKeyStr = generateCompositeKey(currentUser.name, now, recordType);
 
     // Process photo to RustFS / Drive
-    const finalEvidenceUrl = await processEvidencePhoto(evidenceDataUrl, `${currentUser.name}_IN`);
+    const finalEvidenceUrl = await processEvidencePhoto(evidenceDataUrl, `${currentUser.name}_${isDinasLuar ? 'DL' : 'IN'}`);
 
     const newRecord = {
       id: `ATT-IN-${Date.now()}`,
@@ -246,8 +251,8 @@ export function AttendanceProvider({ children }) {
       category: recordCategory,
       shiftType: isShift ? (shiftType || 'PAGI') : null,
       shiftName: shiftLabel,
-      shiftTimeStart: isShift ? (shiftType === 'SORE' ? '14:00' : shiftType === 'MALAM' ? '21:00' : '07:00') : null,
-      shiftTimeEnd: isShift ? (shiftType === 'SORE' ? '21:00' : shiftType === 'MALAM' ? '07:00' : '14:00') : null,
+      shiftTimeStart: isShift ? (shiftType === 'SORE' ? '14:00' : shiftType === 'MALAM' ? '21:00' : '07:00') : (isDinasLuar ? '07:30' : null),
+      shiftTimeEnd: isShift ? (shiftType === 'SORE' ? '21:00' : shiftType === 'MALAM' ? '07:00' : '14:00') : (isDinasLuar ? '14:30' : null),
       evidenceUrl: finalEvidenceUrl,
       evidenceSnapshot: evidenceDataUrl || null,
       compositeKey: compositeKeyStr,
@@ -255,6 +260,8 @@ export function AttendanceProvider({ children }) {
       time: timeStr,
       status: evaluation.status,
       isLate: evaluation.isLate,
+      workDuration: isDinasLuar ? '07:00:00' : null,
+      workDurationHours: isDinasLuar ? 7 : null,
       location: locationInfo || `${currentUser.skpd} (${settings.officeLatitude || -7.780344}, ${settings.officeLongitude || 114.030344})`
     };
 
@@ -265,7 +272,7 @@ export function AttendanceProvider({ children }) {
     cloudApiService.syncAttendance(newRecord, settings?.googleDriveFolderUrl);
 
     triggerSuccessAnimation();
-    showToast(`Presensi ${isShift ? shiftLabel : (isD3 ? 'D3 Masuk' : 'Masuk')} Berhasil! Status: ${evaluation.status}`, 'success');
+    showToast(isDinasLuar ? 'Presensi Dinas Luar Berhasil Dicatat (1x Kehadiran Penuh)!' : `Presensi ${isShift ? shiftLabel : (isD3 ? 'D3 Masuk' : 'Masuk')} Berhasil! Status: ${evaluation.status}`, 'success');
     return { success: true, record: newRecord };
   };
 

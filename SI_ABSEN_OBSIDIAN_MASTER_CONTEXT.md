@@ -1,12 +1,16 @@
 ---
 title: "SI-ABSEN Master Project & Obsidian Documentation"
-date: 2026-09-08
+date: 2026-09-13
 project: "SI-ABSEN (Sistem Informasi Presensi Online Kepegawaian)"
 theme: "SIPP v5.6"
 author: "Google DeepMind / Antigravity AI"
 tags:
   - si-absen
   - sipp-v5-6
+  - face-recognition
+  - biometrics
+  - google-spreadsheet
+  - google-apps-script
   - vercel-postgres
   - neon-database
   - vercel-serverless
@@ -17,215 +21,138 @@ tags:
   - react-vite
   - google-maps-geofencing
   - shift-management
+  - d3-attendance
+  - dinas-luar
+  - izin-cuti-sakit
   - excel-recap-multitab
   - obsidian-vault
 ---
 
-# 📌 SI-ABSEN: Master Context & Obsidian Documentation
+# 📌 SI-ABSEN: Master Context & Obsidian Documentation Hub
 
-Dokumentasi komprehensif ini merangkum seluruh spesifikasi produk, arsitektur cloud serverless, skema database **Vercel Postgres (Neon)**, integrasi penyimpanan foto **Google Drive & RustFS**, modul verifikasi biometrik **FaceID MediaPipe Liveness**, desain antarmuka (*UI/UX*) bertema **SIPP v5.6**, aturan jam kerja (Dinas Harian 41 Jam & Dinas Muter 3-Shift), laporan rekapitulasi multi-tab Excel, serta panduan operasional administrator.
+Dokumentasi komprehensif ini merangkum seluruh arsitektur, modul biometrik **AI Face Recognition & Liveness Test**, **3 Pilihan Mesin Database (Google Spreadsheet GAS, Vercel Postgres Neon, & Dedicated Server RustFS)**, modul **6 Jenis Presensi (Harian, 3-Shift, D3, Dinas Luar 1x Wajah, Izin/Sakit/Cuti)**, sistem geofencing Google Maps, laporan rekapitulasi multi-sheet Excel, serta panduan setup custom domain dan penjualan source code.
 
 ---
 
-## 🏗️ 1. Arsitektur Cloud & Tech Stack
+## 🏗️ 1. Arsitektur Cloud & Multi-Engine Database
 
 ```mermaid
 graph TD
-    ClientPegawai["📱 HP Pegawai (PWA / Browser)"] -->|Presensi Masuk/Pulang & Foto FaceID| VercelAPI["⚡ Vercel Serverless API (/api/sync)"]
-    ClientAdmin["💻 Laptop / PC Admin"] -->|Monitoring & Export Excel (.xlsx)| VercelAPI
+    ClientPegawai["📱 HP Pegawai (PWA / Browser)"] -->|Presensi Masuk/Pulang/D3/Dinas Luar + AI FaceID| AppCore["⚡ SI-ABSEN Core Engine"]
+    ClientAdmin["💻 Laptop / PC Admin"] -->|Monitoring, Manajemen Pegawai, Setting & Export Excel| AppCore
     
-    subgraph Cloud Storage & Database
-        VercelAPI -->|Data Akun, Absensi & Settings| PostgresNeon[("🐘 Vercel Postgres (Neon)")]
-        VercelAPI -->|URL Bukti Foto Presensi| GoogleDrive["📁 Google Drive Storage"]
-        VercelAPI -.->|Opsi Server Mandiri| RustFS["🖥️ RustFS Storage Server"]
+    subgraph Multi Storage & Database Engine
+        AppCore -->|Opsi 1: 100% Gratis Tanpa Sewa DB| GAS["📊 Google Spreadsheet & Google Drive (via Google Apps Script Web App)"]
+        AppCore -->|Opsi 2: Database Cloud Cepat & Terpusat| VercelAPI["⚡ Vercel Serverless (/api/sync)"]
+        VercelAPI --> PostgresNeon[("🐘 Neon PostgreSQL")]
+        VercelAPI --> GDrive["📁 Google Drive Folder Storage"]
+        AppCore -->|Opsi 3: Server Storage Mandiri| RustFS["🖥️ Dedicated Server RustFS"]
     end
 ```
 
 | Komponen | Teknologi | Keterangan |
 | :--- | :--- | :--- |
-| **Frontend Framework** | **React.js 18 + Vite** | SPA modern responsif dengan PWA support (*offline-ready*). |
+| **Frontend Framework** | **React.js 18 + Vite** | Single Page Application responsif dengan PWA support (*offline-ready*). |
 | **UI/UX Styling** | **Vanilla CSS + Lucide Icons** | Mengadopsi visual resmi **SIPP v5.6** (Puskesmas Cermee). |
-| **Biometrik & FaceID** | **MediaPipe FaceMesh** | Deteksi kontur wajah akurat & validasi kedipan mata 1x (*liveness test*). |
-| **Database Cloud** | **Vercel Postgres (Neon Serverless)** | Driver `@neondatabase/serverless`, auto-migration tabel, bebas kuota Apps Script. |
-| **Serverless API** | **Vercel Serverless Functions (`/api/sync`)** | Menyediakan endpoint CRUD terpusat untuk sinkronisasi akun & presensi. |
-| **Storage Foto Bukti** | **Google Drive & RustFS** | Foto bukti kehadiran diarahkan dan dikelola via URL folder Google Drive atau RustFS. |
-| **Export Engine** | **SheetJS (xlsx)** | Menghasilkan file laporan `.xlsx` multi-sheet (Presensi, M1-M5, Rekap Total, Bulanan). |
+| **Biometrik & Face Recognition** | **MediaPipe FaceMesh + Face Descriptor Matching** | Pendaftaran wajah saat registrasi & verifikasi biometrik 1:1 saat absen. |
+| **Pilihan Database 1 (Gratis)** | **Google Spreadsheet + Google Apps Script (GAS)** | 100% gratis, data langsung tersimpan ke Google Sheet & foto ke Google Drive. |
+| **Pilihan Database 2 (Cloud)** | **Vercel Postgres (Neon) + Google Drive** | Database SQL cloud permanen, performa tinggi, foto di Google Drive. |
+| **Pilihan Database 3 (Dedicated)**| **Dedicated Server (RustFS)** | Unggah foto bukti langsung ke VPS / server file storage mandiri. |
+| **Export Engine** | **SheetJS (xlsx)** | Menghasilkan workbook multi-sheet (*Absen Masuk, Pulang, DL, Izin, D3, Rekap Semua, M1-M5, Bulanan*). |
 | **Geofencing & Peta** | **Leaflet + Google Maps** | Validasi radius presensi kantor dengan deteksi GPS live. |
 
 ---
 
-## 📁 2. Hierarki Struktur Folder Penyimpanan Google Drive
+## 👥 2. Modul Biometrik AI Face Recognition & Liveness Detection
 
-Penyimpanan foto bukti presensi dan foto profil pegawai dirancang otomatis tersusun rapi berdasarkan hierarki bertingkat:
+> [!TIP]
+> **Pendaftaran Wajah Saat Registrasi**:
+> Setiap pegawai baru yang mendaftar akun wajib melakukan scan wajah pertama kali. Sistem mengekstrak vektor deskriptor wajah biometrik dan menyimpannya ke database.
 
-```text
-📁 [Folder Induk Google Drive] (ID Folder Utama di Pengaturan Admin)
-   │
-   ├── 📁 Profil pegawai/                            <-- Direktori Khusus Foto Profil Pegawai
-   │   ├── 📷 AGUNG_SISWOYO_19940731202522093.jpg
-   │   └── 📷 PEGAWAI_LAIN_NIP.jpg
-   │
-   └── 📁 2026/                                      <-- Level 1: Tahun (Bukti Kehadiran)
-       │
-       └── 📁 09-September/                          <-- Level 2: Bulan (Format: MM-NamaBulan)
-           │
-           └── 📁 2026-09-08/                        <-- Level 3: Tanggal (Format: YYYY-MM-DD)
-               │
-               ├── 📁 Absen Masuk/                   <-- Level 4: Kategori Masuk / Izin / Sakit
-               │   ├── 📷 AGUNG_SISWOYO_46273_Masuk.jpg
-               │   └── 📷 PEGAWAI_LAIN_46274_Masuk.jpg
-               │
-               └── 📁 Absen Pulang/                  <-- Level 4: Kategori Pulang
-                   ├── 📷 AGUNG_SISWOYO_46273_Pulang.jpg
-                   └── 📷 PEGAWAI_LAIN_46274_Pulang.jpg
-```
-
-### Format Standar Penamaan File Foto (.jpg):
-1. **Foto Profil Pegawai**:
-   - **Lokasi Folder**: `[Folder Utama] / Profil pegawai/`
-   - **Formula**: `{NAMA_PEGAWAI}_{NIP}.jpg`
-   - **Contoh**: `AGUNG_SISWOYO_19940731202522093.jpg`
-2. **Foto Bukti Presensi (Masuk & Pulang)**:
-   - **Lokasi Folder**: `[Folder Utama] / {TAHUN} / {BULAN} / {TANGGAL} / {KATEGORI}/`
-   - **Formula**: `[NAMA_PEGAWAI]_[TIMESTAMP/COMPOSITE_KEY]_[TIPE].jpg`
-   - **Contoh Masuk**: `AGUNG_SISWOYO_46273_Masuk.jpg`
-   - **Contoh Pulang**: `AGUNG_SISWOYO_46273_Pulang.jpg`
-
-### Mekanisme Kolom Bukti Kehadiran (`evidence_url`):
-1. **Link File Langsung**: Dihasilkan saat file foto berhasil diunggah ke storage cloud fisik (Google Drive API / RustFS Dedicated Server). Format URL: `https://drive.google.com/file/d/{fileId}/view` atau `https://rustfs.server/.../foto.jpg`.
-2. **Link Folder Induk (Fallback)**: Jika presensi tersimpan langsung ke Vercel Postgres tanpa storage gateway pihak ketiga, sistem menyimpan link folder induk Google Drive untuk memudahkan admin mengakses direktori penyimpanan.
+### Alur Verifikasi Presensi:
+1. **Pendeteksian Kontur Wajah**: Titik hijau (*mesh landmarks*) mendeteksi posisi mata, hidung, bibir, dan rahang.
+2. **Uji Kedipan Mata (*Liveness Test*)**: Mengukur rasio bukaan kelopak mata (*eyelid landmarks*) dan memvalidasi kedipan mata 1x.
+3. **Pencocokan Biometrik 1:1**: Membandingkan wajah di depan kamera dengan foto master wajah saat registrasi.
+4. **Anti Titip Absen**: Jika wajah berbeda, sistem menampilkan peringatan *"Wajah Tidak Cocok! Titip Absen Ditolak"*.
 
 ---
 
-## 👁️ 3. Modul FaceID & Liveness Blink Detection (MediaPipe)
+## 🎯 3. Manajemen 6 Jenis Presensi Pegawai
 
-Fitur verifikasi kamera wajah mengadopsi standar biometrik keamanan:
-- **Deteksi Kontur Wajah**: Menampilkan titik hijau (*green mesh landmarks*) presisi tinggi pada area mata, alis, bibir, dan garis rahang.
-- **Kalibrasi Baseline Mata Terbuka**: Sistem secara dinamis mengukur rasio bukaan kelopak mata (*eyelid landmarks* 159/145 dan 386/374) saat mata terbuka normal.
-- **Validasi 1x Kedipan Mata Alami**: Terverifikasi sukses saat terjadi penurunan rasio bukaan mata minimal **40%** dari baseline mata terbuka (*relative drop*), lalu mata terbuka kembali.
-- **Strict Frontal Head Pose Alignment**: Mencegah lolos verifikasi jika wajah menghadap ke samping atau posisi miring ekstrim.
-- **Single Native Modal**: Setelah terverifikasi, otomatis mengambil snapshot dan menampilkan modal sukses bawaan SI-ABSEN.
+Sistem mendukung 6 mode presensi lengkap:
 
----
+### 1. 🏢 Dinas Harian (Pagi)
+- **Jadwal Kerja**: Senin–Kamis (07:30–15:00), Jumat (07:00–11:30), Sabtu (07:00–13:00).
+- **Target**: **41 Jam / Minggu**.
+- **Alur**: Absen Masuk (Scan Wajah) & Absen Pulang (Scan Wajah + Hitung Durasi).
 
-## 🗄️ 4. Skema Database PostgreSQL (Vercel Postgres / Neon)
+### 2. 🔄 Dinas Muter (3-Shift)
+- **Shift Pagi**: `07:00 – 14:00` (7 Jam)
+- **Shift Sore**: `14:00 – 21:00` (7 Jam)
+- **Shift Malam**: `21:00 – 07:00` (10 Jam, kalkulasi lintas pergantian hari / *cross-midnight*).
+- **Alur**: Pilih shift ➔ Absen Masuk ➔ Absen Pulang.
 
-Database PostgreSQL mengelola 3 tabel utama secara otomatis saat API `/api/sync` dipanggil:
+### 3. 💼 Presensi Program D3
+- **Alur Baru**: Dilengkapi sub-menu **MASUK D3** & **PULANG D3**.
+- **Kalkulasi**: Menghitung otomatis jam kerja antara D3 Masuk & D3 Pulang.
+- **Rekapitulasi**: Dicatat pada kolom khusus D3 dan diakumulasikan ke target jam kerja.
 
-### A. Tabel `users` (Manajemen Akun)
-```sql
-CREATE TABLE IF NOT EXISTS users (
-  id VARCHAR(64) PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password TEXT NOT NULL,
-  role VARCHAR(32) NOT NULL,       -- 'admin' | 'pegawai'
-  nip VARCHAR(64),
-  skpd VARCHAR(255),
-  photo TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  last_login TIMESTAMPTZ
-);
-```
+### 4. ✈️ Presensi Dinas Luar (Absen Wajah 1x Tanpa Pulang)
+- **Alur Mandiri**: Pegawai langsung scan wajah di lokasi tugas dinas luar.
+- **Bypass Kunci Lokasi Kantor**: Geofencing kantor dilewati otomatis karena penugasan berada di luar instansi.
+- **Tanpa Perlu Absen Pulang**: Otomatis tercatat hadir penuh **1x seharian (7 Jam kerja)**.
 
-### B. Tabel `attendance` (Transaksi Presensi)
-```sql
-CREATE TABLE IF NOT EXISTS attendance (
-  id VARCHAR(64) PRIMARY KEY,
-  user_id VARCHAR(64),
-  user_name VARCHAR(255) NOT NULL,
-  nip VARCHAR(64),
-  email VARCHAR(255),
-  skpd VARCHAR(255),
-  date VARCHAR(32) NOT NULL,       -- Format: DD/MM/YYYY
-  time VARCHAR(32) NOT NULL,       -- Format: HH:mm:ss
-  timestamp TIMESTAMPTZ DEFAULT NOW(),
-  type VARCHAR(64) NOT NULL,       -- 'Masuk' | 'Pulang' | 'Izin' | 'Sakit' | 'Dinas Luar'
-  category VARCHAR(32) DEFAULT 'HARIAN', -- 'HARIAN' | 'SHIFT'
-  shift_type VARCHAR(32),          -- 'PAGI' | 'SORE' | 'MALAM'
-  schedule_in VARCHAR(16),
-  schedule_out VARCHAR(16),
-  is_late BOOLEAN DEFAULT FALSE,
-  late_minutes INT DEFAULT 0,
-  is_early_leave BOOLEAN DEFAULT FALSE,
-  early_leave_minutes INT DEFAULT 0,
-  work_duration_minutes INT DEFAULT 0,
-  status VARCHAR(64),              -- 'Tepat Waktu' | 'Terlambat X Menit'
-  evidence_url TEXT,
-  notes TEXT,
-  latitude NUMERIC(10, 7),
-  longitude NUMERIC(10, 7),
-  distance_meters NUMERIC(10, 2)
-);
-```
+### 5. 📝 Pengajuan Izin, Sakit & Cuti (Terpisah Mandiri)
+- **3 Opsi Surat**:
+  - **Izin**: Izin keperluan pribadi / dinas tertentu.
+  - **Sakit**: Dilengkapi unggah foto surat dokter.
+  - **Cuti**: Cuti tahunan / cuti penting.
+- Dilengkapi periode tanggal mulai & selesai, alasan lengkap, dan preview dokumen foto.
 
-### C. Tabel `settings` (Konfigurasi Aplikasi)
-```sql
-CREATE TABLE IF NOT EXISTS settings (
-  key VARCHAR(64) PRIMARY KEY,
-  value JSONB NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+### 6. ⚙️ Mode Test Presensi
+- Simulasi kamera dan koordinat GPS untuk kebutuhan pelatihan pegawai.
 
 ---
 
-## 🌐 5. Struktur URL & Routing Aplikasi
+## 📊 4. Modul Laporan & Export Multi-Sheet Excel
 
-| URL Path | Halaman / Fungsi | Keterangan |
-| :--- | :--- | :--- |
-| **`/pegawai/login`** atau **`/`** | **Portal Login Pegawai** | Halaman login khusus pegawai dengan validasi Postgres & auto-cache kredensial. |
-| **`/administrator/login`** | **Portal Login Administrator** | Halaman login aman khusus Super Admin (`admin@siabsen.go.id`). |
-| **`/download`** (atau `/unduh`) | **Installer Aplikasi PWA** | Panduan instalasi PWA di smartphone Android (Chrome) dan iPhone (Safari). |
-| **`/pegawai/dashboard`** | **Dashboard Pegawai (SIPP v5.6)** | Antarmuka presensi mobile: scan wajah biometrik, radar GPS, riwayat presensi harian & shift, monitoring jam kerja. |
-| **`/administrator/dashboard`** | **Dashboard Administrator** | Monitoring presensi real-time, switcher Harian vs 3-Shift, Data Pegawai, Geofencing, Uji Koneksi Database Postgres, dan Unduh Excel Rekap. |
-| **`/pegawai/register`** | **Pendaftaran Akun Pegawai** | Form registrasi pegawai baru terhubung langsung ke Vercel Postgres. |
+Dashboard Admin menyediakan tombol **"Unduh Excel Rekap"** yang menghasilkan file `.xlsx` berisi 8 lembar kerja lengkap:
 
----
-
-## ⏱️ 6. Aturan Jam Kerja & Klasifikasi Kehadiran
-
-### A. Dinas Harian (Target 41 Jam / Minggu)
-- **Senin – Kamis**: `07:30 – 15:00` (7.5 Jam)
-- **Jumat**: `07:00 – 11:30` (4.5 Jam)
-- **Sabtu**: `07:00 – 13:00` (6.0 Jam)
-- **Minggu**: Libur Rutin
-- **Total Target**: **41 Jam / Minggu**
-
-### B. Dinas Muter (3 Shift)
-- **Dinas Pagi**: `07:00 – 14:00` (7.0 Jam)
-- **Dinas Sore**: `14:00 – 21:00` (7.0 Jam)
-- **Dinas Malam**: `21:00 – 07:00` (10.0 Jam, mendukung perhitungan lintas pergantian hari / *cross-midnight*).
-
-### C. Klasifikasi Khusus
-- **D3 (Dinas Luar 3 Hari / Tugas Khusus)**: Dicatat dengan akumulasi jam kerja otomatis.
-- **Dinas Luar (DL)**: Presensi tugas luar kantor dengan radius GPS fleksibel.
-- **Izin & Sakit**: Upload surat dokter / bukti keterangan yang disimpan ke storage cloud.
+1. **Sheet 1: `Absen Masuk`** (Log presensi masuk Harian, Shift, D3).
+2. **Sheet 2: `Absen Pulang`** (Log presensi pulang Harian, Shift, D3 beserta durasi kerja).
+3. **Sheet 3: `Daftar Dinas Luar`** (Log dinas luar, lokasi penugasan, foto bukti lapangan).
+4. **Sheet 4: `Daftar Izin & Cuti`** (Log izin, sakit, cuti, surat dokter, tanggal mulai-selesai).
+5. **Sheet 5: `Daftar D3`** (Log presensi D3 Masuk & Pulang).
+6. **Sheet 6: `REKAP SEMUA JENIS`** (Tabel komparatif per pegawai: Hadir Harian, Shift, D3, DL, Izin, Sakit, Cuti, Total Jam 1 Bulan, Evaluasi Target).
+7. **Sheet 7: `REKAP M1 s/d M5`** (Matriks kehadiran mingguan per tanggal).
+8. **Sheet 8: `REKAP BULANAN`** (Statistik akumulasi bulanan seluruh pegawai).
 
 ---
 
-## 📊 7. Modul Laporan & Export Multi-Tab Excel
+## 💼 5. Strategi Jual Beli Source Code & Deployment Konsumen
 
-Dashboard Admin menyediakan tombol **"Unduh Excel Rekap"** yang menghasilkan file `.xlsx` berisi lembar kerja (sheet) lengkap via SheetJS:
-
-1. **Sheet 1: Absen Masuk** (Log presensi masuk & izin harian).
-2. **Sheet 2: Absen Pulang** (Log presensi pulang & durasi jam kerja).
-3. **Sheet 3: Rekap Mingguan M1 - M5** (Matriks kehadiran mingguan per pegawai).
-4. **Sheet 4: Rekap Total Perminggu** (Akumulasi target jam kerja 41 jam).
-5. **Sheet 5: Rekap Bulanan** (Statistik kehadiran, keterlambatan, dan rekapitulasi akhir).
+> [!NOTE]
+> **Model Bisnis**:
+> Anda menjual akses source code / lisensi repositori GitHub. Pembeli dapat memilih cara deployment:
+> 1. **Versi Gratis / Tanpa Biaya Database (Google Spreadsheet & GAS)**: Pembeli hanya perlu deploy frontend di Vercel gratis (`nama.vercel.app`) dan menyalin kode template `Code.gs` ke Spreadsheet milik mereka.
+> 2. **Versi Berbayar / Custom Domain Instansi**: Pembeli menghubungkan database Vercel Postgres dan memasang domain instansi (`absen.namasekolah.sch.id` atau `absen.perusahaan.com`).
 
 ---
 
-## ⚙️ 8. Panduan Menghubungkan Vercel Postgres
+## 📖 6. Panduan Setup Custom Domain & DNS Record
 
-1. Buka [Vercel Dashboard](https://vercel.com/dashboard) ➔ Pilih project **`SI-ABSEN`**.
-2. Masuk ke tab **Storage** ➔ Klik **Create Database** ➔ Pilih **Postgres (Neon)**.
-3. Klik **Connect to Project** (Vercel otomatis menyediakan environment variable `POSTGRES_URL`).
-4. Pada Dashboard Admin ➔ Tab **Pengaturan** ➔ Klik **"🧪 Uji Koneksi Vercel Postgres & Drive"** untuk memastikan database cloud aktif.
+| Tipe Domain | Type Record | Name / Host | Target / Value |
+| :--- | :--- | :--- | :--- |
+| **Subdomain** (misal: `absen.instansi.go.id`) | `CNAME` | `absen` | `cname.vercel-dns.com` |
+| **Root Domain** (misal: `perusahaan.com`) | `A` | `@` | `76.76.21.21` |
+
+> [!IMPORTANT]
+> Sertifikat SSL (HTTPS) diterbitkan dan diperbarui secara otomatis & gratis oleh Vercel.
 
 ---
 
-## 🔒 9. Kredensial Default Administrator
+## 🔒 7. Kredensial Administrator Default
 
+- **URL Admin**: `/administrator/login`
 - **Email**: `admin@siabsen.go.id`
-- **Password**: `admin`
+- **Password**: `admin` *(Sistem mewajibkan penggantian password pada login pertama)*.

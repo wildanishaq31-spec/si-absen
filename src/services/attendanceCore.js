@@ -210,12 +210,14 @@ export function buildWeeklyRecap(users = [], attendanceRecords = [], year = 2026
     { key: 'REKAP M5', weekNumber: 5, label: 'Minggu Ke-5 (M5)', startDay: 29, endDay: totalDays }
   ];
 
+  const weeks = weekSlots;
   const isShiftMode = category === 'SHIFT';
+  const isSemuaMode = category === 'SEMUA' || !category;
 
-  return weekSlots.map(week => {
+  return weeks.map(week => {
     // Generate dates for this week
     const weekDates = [];
-    for (let day = week.startDay; day <= Math.min(week.endDay, totalDays); day++) {
+    for (let day = week.startDay; day <= week.endDay; day++) {
       const d = new Date(year, monthIndex, day);
       const dayOfWeek = d.getDay();
       const schedule = WORK_SCHEDULE[dayOfWeek];
@@ -239,6 +241,8 @@ export function buildWeeklyRecap(users = [], attendanceRecords = [], year = 2026
       let leaveDays = 0;
       let sickDays = 0;
       let cutiDays = 0;
+      let dinasLuarDays = 0;
+      let d3Days = 0;
       let dailyDetails = [];
 
       weekDates.forEach(wDate => {
@@ -254,18 +258,29 @@ export function buildWeeklyRecap(users = [], attendanceRecords = [], year = 2026
 
         let checkIn, checkOut, leave;
 
-        if (isShiftMode) {
+        if (category === 'SHIFT') {
           // Shift records: has category === 'SHIFT' or shiftType or type contains 'Shift'
           const shiftRecords = userRecords.filter(r => r.category === 'SHIFT' || r.shiftType || r.type?.includes('Shift'));
           checkIn = shiftRecords.find(r => r.type === 'Shift Masuk' || r.type === 'Masuk' || r.type === 'HARIAN_MASUK');
           checkOut = shiftRecords.find(r => r.type === 'Shift Pulang' || r.type === 'Pulang' || r.type === 'HARIAN_PULANG');
           leave = userRecords.find(r => ['Izin', 'Sakit', 'Cuti', 'Dinas Luar'].includes(r.type) && r.category === 'SHIFT');
-        } else {
+        } else if (category === 'HARIAN') {
           // Non-shift records: category !== 'SHIFT'
           const harianRecords = userRecords.filter(r => r.category !== 'SHIFT' && !r.shiftType && !r.type?.includes('Shift'));
           checkIn = harianRecords.find(r => r.type === 'Masuk' || r.type === 'HARIAN_MASUK');
           checkOut = harianRecords.find(r => r.type === 'Pulang' || r.type === 'HARIAN_PULANG');
           leave = userRecords.find(r => ['Izin', 'Sakit', 'Cuti', 'Dinas Luar'].includes(r.type) && r.category !== 'SHIFT');
+        } else if (category === 'DINAS_LUAR') {
+          leave = userRecords.find(r => r.type === 'Dinas Luar');
+        } else if (category === 'IZIN_SAKIT_CUTI') {
+          leave = userRecords.find(r => ['Izin', 'Sakit', 'Cuti'].includes(r.type));
+        } else if (category === 'D3') {
+          checkIn = userRecords.find(r => r.type === 'D3');
+        } else {
+          // SEMUA (All Categories)
+          checkIn = userRecords.find(r => ['Masuk', 'HARIAN_MASUK', 'Shift Masuk', 'SHIFT_MASUK', 'D3'].includes(r.type));
+          checkOut = userRecords.find(r => ['Pulang', 'HARIAN_PULANG', 'Shift Pulang', 'SHIFT_PULANG'].includes(r.type));
+          leave = userRecords.find(r => ['Izin', 'Sakit', 'Cuti', 'Dinas Luar'].includes(r.type));
         }
 
         let dayStatus = '-';
@@ -273,64 +288,89 @@ export function buildWeeklyRecap(users = [], attendanceRecords = [], year = 2026
         let durationHours = 0;
         let lateText = '-';
         let earlyText = '-';
-        let shiftLabel = isShiftMode ? (checkIn?.shiftName || checkIn?.shiftType ? `Shift ${checkIn.shiftType || checkIn.shiftName}` : '-') : '';
+        const isShiftRow = checkIn?.category === 'SHIFT' || Boolean(checkIn?.shiftType) || checkIn?.type?.includes('Shift');
+        let shiftLabel = isShiftRow ? (checkIn?.shiftName || checkIn?.shiftType ? `Shift ${checkIn.shiftType || checkIn.shiftName}` : 'Shift') : '';
         let isCuti = false;
         let isIzin = false;
         let isSakit = false;
+        let isDinasLuar = false;
+        let isD3 = false;
 
-        if (dayOfWeek === 0 && !isShiftMode) {
+        if (dayOfWeek === 0 && !isShiftMode && !isShiftRow) {
           dayStatus = 'Libur';
         } else if (leave) {
           dayStatus = leave.type;
           if (leave.type === 'Cuti') { isCuti = true; cutiDays++; }
           else if (leave.type === 'Sakit') { isSakit = true; sickDays++; }
-          else { isIzin = true; leaveDays++; }
+          else if (leave.type === 'Dinas Luar') { 
+            isDinasLuar = true; 
+            dinasLuarDays++;
+            totalSeconds += (schedule?.targetHours || 7) * 3600;
+            durationHours = schedule?.targetHours || 7;
+            durationFormatted = `${Math.floor(durationHours)}:00:00`;
+          } else { 
+            isIzin = true; 
+            leaveDays++; 
+          }
         } else if (checkIn) {
-          presentDays++;
-          
-          if (isShiftMode) {
-            const shiftId = checkIn.shiftType || 'PAGI';
-            const inEval = evaluateShiftCheckIn(checkIn.time, shiftId, currentDate);
-            lateText = inEval.lateFormatted;
-            if (inEval.isLate) lateDays++;
-
-            if (checkOut) {
-              const isOvernight = shiftId === 'MALAM';
-              const duration = calculateWorkDuration(checkIn.time, checkOut.time, currentDate, isOvernight);
-              totalSeconds += duration.seconds;
-              durationFormatted = duration.formatted;
-              durationHours = duration.decimalHours;
-              const outEval = evaluateShiftCheckOut(checkOut.time, shiftId, currentDate);
-              earlyText = outEval.earlyFormatted;
-              if (outEval.isEarly) earlyDays++;
-              dayStatus = `Hadir (${checkIn.shiftType || 'Pagi'})`;
-            } else {
-              dayStatus = 'Belum Pulang';
-              totalSeconds += 7 * 3600;
-            }
+          if (checkIn.type === 'D3') {
+            isD3 = true;
+            d3Days++;
+            dayStatus = 'D3 (Hadir)';
+            totalSeconds += (schedule?.targetHours || 7) * 3600;
+            durationHours = schedule?.targetHours || 7;
+            durationFormatted = `${Math.floor(durationHours)}:00:00`;
           } else {
-            const inEval = evaluateCheckIn(checkIn.time, currentDate);
-            lateText = inEval.lateFormatted;
-            if (inEval.isLate) lateDays++;
+            presentDays++;
+            
+            if (isShiftRow || isShiftMode) {
+              const shiftId = checkIn.shiftType || 'PAGI';
+              const inEval = evaluateShiftCheckIn(checkIn.time, shiftId, currentDate);
+              lateText = inEval.lateFormatted;
+              if (inEval.isLate) lateDays++;
 
-            if (checkOut) {
-              const duration = calculateWorkDuration(checkIn.time, checkOut.time, currentDate);
-              totalSeconds += duration.seconds;
-              durationFormatted = duration.formatted;
-              durationHours = duration.decimalHours;
-              const outEval = evaluateCheckOut(checkOut.time, currentDate);
-              earlyText = outEval.earlyFormatted;
-              if (outEval.isEarly) earlyDays++;
-              dayStatus = 'Hadir';
+              if (checkOut) {
+                const isOvernight = shiftId === 'MALAM';
+                const duration = calculateWorkDuration(checkIn.time, checkOut.time, currentDate, isOvernight);
+                totalSeconds += duration.seconds;
+                durationFormatted = duration.formatted;
+                durationHours = duration.decimalHours;
+                const outEval = evaluateShiftCheckOut(checkOut.time, shiftId, currentDate);
+                earlyText = outEval.earlyFormatted;
+                if (outEval.isEarly) earlyDays++;
+                dayStatus = `Hadir (${checkIn.shiftType || 'Pagi'})`;
+              } else {
+                dayStatus = 'Belum Pulang';
+                totalSeconds += 7 * 3600;
+                durationHours = 7;
+                durationFormatted = '07:00:00';
+              }
             } else {
-              dayStatus = 'Belum Pulang';
-              totalSeconds += (schedule?.targetHours || 7) * 0.5 * 3600;
+              const inEval = evaluateCheckIn(checkIn.time, currentDate);
+              lateText = inEval.lateFormatted;
+              if (inEval.isLate) lateDays++;
+
+              if (checkOut) {
+                const duration = calculateWorkDuration(checkIn.time, checkOut.time, currentDate);
+                totalSeconds += duration.seconds;
+                durationFormatted = duration.formatted;
+                durationHours = duration.decimalHours;
+                const outEval = evaluateCheckOut(checkOut.time, currentDate);
+                earlyText = outEval.earlyFormatted;
+                if (outEval.isEarly) earlyDays++;
+                dayStatus = 'Hadir';
+              } else {
+                dayStatus = 'Belum Pulang';
+                totalSeconds += (schedule?.targetHours || 7) * 0.5 * 3600;
+                durationHours = (schedule?.targetHours || 7) * 0.5;
+                durationFormatted = formatDuration(totalSeconds);
+              }
             }
           }
         } else {
           const today = new Date();
-          if (currentDate < today && (isShiftMode || dayOfWeek !== 0)) {
-            dayStatus = isShiftMode ? 'Off / Tidak Hadir' : 'Alpa';
+          if (currentDate < today && (isShiftMode || isShiftRow || dayOfWeek !== 0)) {
+            dayStatus = (isShiftMode || isShiftRow) ? 'Off / Tidak Hadir' : 'Alpa';
           }
         }
 
@@ -338,8 +378,8 @@ export function buildWeeklyRecap(users = [], attendanceRecords = [], year = 2026
           day: wDate.day,
           dayName: wDate.dayName,
           date: dateStr,
-          scheduleIn: isShiftMode ? (checkIn?.shiftTimeStart || '07:00') : wDate.scheduleStart,
-          scheduleOut: isShiftMode ? (checkOut?.shiftTimeEnd || '14:00') : wDate.scheduleEnd,
+          scheduleIn: (isShiftRow || isShiftMode) ? (checkIn?.shiftTimeStart || '07:00') : wDate.scheduleStart,
+          scheduleOut: (isShiftRow || isShiftMode) ? (checkOut?.shiftTimeEnd || '14:00') : wDate.scheduleEnd,
           shiftLabel,
           checkIn: checkIn ? checkIn.time : '-',
           checkInEvidence: checkIn ? (checkIn.evidenceUrl || checkIn.evidenceSnapshot) : '',
@@ -352,6 +392,8 @@ export function buildWeeklyRecap(users = [], attendanceRecords = [], year = 2026
           isCuti,
           isIzin,
           isSakit,
+          isDinasLuar,
+          isD3,
           status: dayStatus
         });
       });
@@ -376,7 +418,9 @@ export function buildWeeklyRecap(users = [], attendanceRecords = [], year = 2026
         earlyDays,
         leaveDays,
         sickDays,
-        cutiDays
+        cutiDays,
+        dinasLuarDays,
+        d3Days
       };
     });
 
@@ -400,10 +444,12 @@ export function buildMonthlyRecap(users = [], weeklyRecap = []) {
     let grandLeaveDays = 0;
     let grandSickDays = 0;
     let grandCutiDays = 0;
+    let grandDinasLuarDays = 0;
+    let grandD3Days = 0;
     let weeklyBreakdown = [];
 
     weeklyRecap.forEach(week => {
-      const userSummary = week.users.find(u => u.user.email === user.email) || {};
+      const userSummary = week.users?.find(u => u.user.email === user.email) || {};
       const hours = userSummary.totalHours || 0;
       grandTotalHours += hours;
       grandPresentDays += userSummary.presentDays || 0;
@@ -412,6 +458,8 @@ export function buildMonthlyRecap(users = [], weeklyRecap = []) {
       grandLeaveDays += userSummary.leaveDays || 0;
       grandSickDays += userSummary.sickDays || 0;
       grandCutiDays += userSummary.cutiDays || 0;
+      grandDinasLuarDays += userSummary.dinasLuarDays || 0;
+      grandD3Days += userSummary.d3Days || 0;
 
       weeklyBreakdown.push({
         weekName: week.label,
@@ -433,10 +481,11 @@ export function buildMonthlyRecap(users = [], weeklyRecap = []) {
       grandLeaveDays,
       grandSickDays,
       grandCutiDays,
+      grandDinasLuarDays,
+      grandD3Days,
       weeklyBreakdown,
       targetMonthlyHours,
       isMonthlyTargetMet
     };
   });
 }
-

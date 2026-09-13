@@ -5,7 +5,7 @@ import {
   Settings, ShieldCheck, FileSpreadsheet, Eye, 
   Table, LayoutGrid, Check, X as CloseIcon, Layers, Sun, Moon, Sunset, LogOut, MapPin, Building2,
   Folder, FolderTree, HardDrive, Cloud, Database, Copy, Trash2, CheckSquare, Square, Code, FileText,
-  ChevronDown, ChevronUp, Globe, Sparkles
+  ChevronDown, ChevronUp, Globe, Sparkles, Plane, Briefcase, FileCheck, CheckCircle
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAttendance } from '../../contexts/AttendanceContext';
@@ -50,6 +50,10 @@ const ADMIN_TAB_ROUTES = {
   'DASHBOARD': '/administrator/dashboard',
   'MASUK': '/administrator/presensi-masuk',
   'PULANG': '/administrator/presensi-pulang',
+  'DINAS_LUAR': '/administrator/dinas-luar',
+  'IZIN_SAKIT_CUTI': '/administrator/izin-sakit-cuti',
+  'D3': '/administrator/presensi-d3',
+  'REKAP_SEMUA_JENIS': '/administrator/rekap-semua-jenis',
   'REKAP_ABSENSI': '/administrator/rekap-mingguan',
   'REKAP_TOTAL_MINGGU': '/administrator/rekap-total-perminggu',
   'REKAP_BULAN': '/administrator/rekap-bulanan',
@@ -61,6 +65,10 @@ const resolveAdminTabFromPath = (path) => {
   const p = (path || '').toLowerCase();
   if (p.includes('presensi-masuk') || p.endsWith('/masuk')) return 'MASUK';
   if (p.includes('presensi-pulang') || p.endsWith('/pulang')) return 'PULANG';
+  if (p.includes('dinas-luar')) return 'DINAS_LUAR';
+  if (p.includes('izin-sakit-cuti') || p.includes('izin') || p.includes('cuti') || p.includes('sakit')) return 'IZIN_SAKIT_CUTI';
+  if (p.includes('presensi-d3') || p.endsWith('/d3')) return 'D3';
+  if (p.includes('rekap-semua-jenis') || p.includes('rekap-semua')) return 'REKAP_SEMUA_JENIS';
   if (p.includes('rekap-total-perminggu') || p.includes('rekap-total')) return 'REKAP_TOTAL_MINGGU';
   if (p.includes('rekap-mingguan') || p.includes('rekap-absensi')) return 'REKAP_ABSENSI';
   if (p.includes('rekap-bulanan') || p.includes('rekap-bulan')) return 'REKAP_BULAN';
@@ -89,7 +97,12 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const [selectedMasukIds, setSelectedMasukIds] = useState([]);
   const [selectedPulangIds, setSelectedPulangIds] = useState([]);
+  const [selectedDinasLuarIds, setSelectedDinasLuarIds] = useState([]);
+  const [selectedIzinIds, setSelectedIzinIds] = useState([]);
+  const [selectedD3Ids, setSelectedD3Ids] = useState([]);
   const [isDeletingRecords, setIsDeletingRecords] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState(null);
+  const [izinFilterType, setIzinFilterType] = useState('SEMUA');
 
   // Auto-sync on mount
   useEffect(() => {
@@ -102,18 +115,18 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
     try {
       if (refreshUsersFromCloud) await refreshUsersFromCloud();
       if (refreshAttendanceFromCloud) await refreshAttendanceFromCloud();
-      showSuccess('Data Pegawai & Presensi berhasil disinkronkan dari Google Sheets!');
+      showSuccess('Data Pegawai & Presensi berhasil disinkronkan dari Google Sheets / Database Cloud!');
     } catch (err) {
-      showError('Gagal sinkronisasi dari Google Sheets: ' + err.message);
+      showError('Gagal sinkronisasi dari Cloud: ' + err.message);
     } finally {
       setIsSyncingCloud(false);
     }
   };
 
-  // Active Category: 'HARIAN' (Dinas Pagi) vs 'SHIFT' (Dinas Muter 3-Shift)
-  const [attendanceCategory, setAttendanceCategory] = useState('HARIAN');
+  // Active Category: 'SEMUA' | 'HARIAN' | 'SHIFT' | 'D3' | 'DINAS_LUAR' | 'IZIN_SAKIT_CUTI'
+  const [attendanceCategory, setAttendanceCategory] = useState('SEMUA');
 
-  // Active Main Tab: 'DASHBOARD', 'MASUK', 'PULANG', 'REKAP_ABSENSI', 'REKAP_TOTAL_MINGGU', 'REKAP_BULAN', 'DATA_PEGAWAI', 'SETTINGS'
+  // Active Main Tab
   const [activeTab, setActiveTabState] = useState(() => {
     const initialPath = currentPath || (typeof window !== 'undefined' ? window.location.pathname : '');
     return resolveAdminTabFromPath(initialPath);
@@ -130,7 +143,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
     }
   };
 
-  // Sync activeTab whenever URL / currentPath changes (e.g. browser back/forward buttons or direct navigation)
+  // Sync activeTab whenever URL / currentPath changes
   useEffect(() => {
     const targetPath = currentPath || (typeof window !== 'undefined' ? window.location.pathname : '');
     const tabFromUrl = resolveAdminTabFromPath(targetPath);
@@ -144,11 +157,11 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
   const [selectedMonth, setSelectedMonth] = useState(8); // September
   const [selectedYear, setSelectedYear] = useState(2026);
   const [selectedWeek, setSelectedWeek] = useState(0); // Minggu 1
-  const [rekapViewMode, setRekapViewMode] = useState('TABLE_DETAIL'); // 'TABLE_DETAIL' (Gambar 3) or 'MATRIX' (Gambar 2)
+  const [rekapViewMode, setRekapViewMode] = useState('TABLE_DETAIL'); // 'TABLE_DETAIL' or 'MATRIX'
 
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Multi-Engine Storage Mode: 'SPREADSHEET' (Google Spreadsheet & Drive via GAS) vs 'GOOGLE' (Vercel Postgres & Google Drive) vs 'SERVER' (Dedicated RustFS Storage Server)
+  // Multi-Engine Storage Mode
   const [storageProviderInput, setStorageProviderInput] = useState(settings?.storageProvider || 'SPREADSHEET');
   const [gasDeploymentUrlInput, setGasDeploymentUrlInput] = useState(settings?.gasDeploymentUrl || '');
   const [testingGas, setTestingGas] = useState(false);
@@ -172,37 +185,49 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
   const [officeRadiusInput, setOfficeRadiusInput] = useState(typeof settings?.officeRadiusMeters === 'number' ? settings.officeRadiusMeters : 100);
   const [strictLockInput, setStrictLockInput] = useState(settings?.strictLocationLock !== false);
 
-  // Helper to distinguish shift records vs daily records
-  const isShiftRecord = (r) => r.category === 'SHIFT' || Boolean(r.shiftType) || r.type?.includes('Shift') || r.type?.startsWith('SHIFT_');
+  // All records list
+  const allRecords = records || [];
 
-  // Filter records based on selected category (Harian vs Shift)
-  const categoryRecords = (records || []).filter(r => {
-    if (attendanceCategory === 'SHIFT') {
-      return isShiftRecord(r);
-    }
-    return !isShiftRecord(r);
+  // Helper filters for presence types
+  const isShiftRecord = (r) => r.category === 'SHIFT' || Boolean(r.shiftType) || r.type?.includes('Shift') || r.type?.startsWith('SHIFT_');
+  const isD3Record = (r) => r.type === 'D3';
+  const isDinasLuarRecord = (r) => r.type === 'Dinas Luar';
+  const isIzinSakitCutiRecord = (r) => ['Izin', 'Sakit', 'Cuti'].includes(r.type);
+
+  // Filter records based on selected category ('SEMUA' | 'HARIAN' | 'SHIFT' | 'D3' | 'DINAS_LUAR' | 'IZIN_SAKIT_CUTI')
+  const categoryRecords = allRecords.filter(r => {
+    if (attendanceCategory === 'SHIFT') return isShiftRecord(r);
+    if (attendanceCategory === 'HARIAN') return !isShiftRecord(r) && !isD3Record(r) && !isDinasLuarRecord(r) && !isIzinSakitCutiRecord(r);
+    if (attendanceCategory === 'D3') return isD3Record(r);
+    if (attendanceCategory === 'DINAS_LUAR') return isDinasLuarRecord(r);
+    if (attendanceCategory === 'IZIN_SAKIT_CUTI') return isIzinSakitCutiRecord(r);
+    return true; // 'SEMUA'
   });
 
-  // Calculate live statistics for the selected category
+  // Calculate live statistics
   const employeeUsers = (users || []).filter(u => u.role === 'pegawai');
   const totalEmployees = employeeUsers.length;
   
-  const masukRecords = categoryRecords.filter(r => 
-    r.type === 'Masuk' || r.type === 'HARIAN_MASUK' || r.type === 'SHIFT_MASUK' || r.type?.toLowerCase().includes('masuk')
+  const masukRecords = allRecords.filter(r => 
+    r.type === 'Masuk' || r.type === 'HARIAN_MASUK' || r.type === 'Shift Masuk' || r.type === 'SHIFT_MASUK' || r.type === 'D3' || r.type?.toLowerCase().includes('masuk')
   );
-  const pulangRecords = categoryRecords.filter(r => 
-    r.type === 'Pulang' || r.type === 'HARIAN_PULANG' || r.type === 'SHIFT_PULANG' || r.type?.toLowerCase().includes('pulang')
+  const pulangRecords = allRecords.filter(r => 
+    r.type === 'Pulang' || r.type === 'HARIAN_PULANG' || r.type === 'Shift Pulang' || r.type === 'SHIFT_PULANG' || r.type?.toLowerCase().includes('pulang')
   );
-  const onTimeCount = masukRecords.filter(r => !r.isLate).length;
-  const lateCount = masukRecords.filter(r => r.isLate).length;
-  const leaveCount = categoryRecords.filter(r => ['Izin', 'Sakit', 'Cuti', 'Dinas Luar'].includes(r.type)).length;
+  const dinasLuarRecords = allRecords.filter(r => r.type === 'Dinas Luar');
+  const izinSakitCutiRecords = allRecords.filter(r => ['Izin', 'Sakit', 'Cuti'].includes(r.type));
+  const d3Records = allRecords.filter(r => r.type === 'D3');
 
-  // Build weekly recap dynamically based on selected Year, Month & Attendance Category
-  const weeklyRecap = buildWeeklyRecap(employeeUsers, records || [], selectedYear, selectedMonth, attendanceCategory) || [];
-  const monthlyRecap = buildMonthlyRecap(employeeUsers, weeklyRecap, attendanceCategory) || [];
+  const onTimeCount = masukRecords.filter(r => !r.isLate && r.type !== 'D3').length;
+  const lateCount = masukRecords.filter(r => r.isLate).length;
+  const leaveCount = izinSakitCutiRecords.length;
+
+  // Build weekly & monthly recap dynamically
+  const weeklyRecap = buildWeeklyRecap(employeeUsers, allRecords, selectedYear, selectedMonth, attendanceCategory) || [];
+  const monthlyRecap = buildMonthlyRecap(employeeUsers, weeklyRecap) || [];
   const activeWeekData = (weeklyRecap && weeklyRecap[selectedWeek]) || weeklyRecap[0] || { users: [], weekDates: [] };
 
-  // Filtered lists for Masuk / Pulang tabs
+  // Filtered lists with Search Query
   const filteredMasuk = masukRecords.filter(
     r => r.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
          r.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -215,29 +240,40 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
          r.date?.includes(searchQuery)
   );
 
-  // --- SELECTION & DELETION HANDLERS (PRESENSI MASUK & PULANG) ---
+  const filteredDinasLuar = dinasLuarRecords.filter(
+    r => r.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         r.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         r.reason?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         r.date?.includes(searchQuery)
+  );
+
+  const filteredIzinSakitCuti = izinSakitCutiRecords.filter(
+    r => (izinFilterType === 'SEMUA' || r.type === izinFilterType) &&
+         (r.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          r.reason?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          r.date?.includes(searchQuery))
+  );
+
+  const filteredD3 = d3Records.filter(
+    r => r.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         r.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         r.date?.includes(searchQuery)
+  );
+
+  // Selection handlers for Masuk
   const isAllMasukSelected = filteredMasuk.length > 0 && filteredMasuk.every(r => selectedMasukIds.includes(r.id));
-  const isAllPulangSelected = filteredPulang.length > 0 && filteredPulang.every(r => selectedPulangIds.includes(r.id));
-
   const handleToggleSelectAllMasuk = () => {
-    if (isAllMasukSelected) {
-      setSelectedMasukIds([]);
-    } else {
-      setSelectedMasukIds(filteredMasuk.map(r => r.id));
-    }
+    if (isAllMasukSelected) setSelectedMasukIds([]);
+    else setSelectedMasukIds(filteredMasuk.map(r => r.id));
   };
-
   const handleToggleSelectMasuk = (id) => {
-    setSelectedMasukIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
+    setSelectedMasukIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
-
   const handleDeleteSelectedMasuk = () => {
     if (selectedMasukIds.length === 0) return;
     showConfirm({
       title: 'HAPUS DATA PRESENSI MASUK',
-      message: `Apakah Anda yakin ingin menghapus ${selectedMasukIds.length} data presensi masuk terpilih? Data uji coba ini akan dibersihkan secara permanen dari database lokal & cloud.`,
+      message: `Hapus ${selectedMasukIds.length} data presensi masuk terpilih?`,
       type: 'warning',
       confirmText: `YA, HAPUS (${selectedMasukIds.length}) DATA`,
       cancelText: 'BATAL',
@@ -252,11 +288,10 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
       }
     });
   };
-
   const handleDeleteSingleMasuk = (r) => {
     showConfirm({
       title: 'HAPUS PRESENSI MASUK',
-      message: `Apakah Anda yakin ingin menghapus data presensi masuk atas nama "${r.userName}" (${r.date} ${r.time})?`,
+      message: `Hapus data presensi masuk atas nama "${r.userName}" (${r.date} ${r.time})?`,
       type: 'warning',
       confirmText: 'YA, HAPUS',
       cancelText: 'BATAL',
@@ -267,25 +302,20 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
     });
   };
 
+  // Selection handlers for Pulang
+  const isAllPulangSelected = filteredPulang.length > 0 && filteredPulang.every(r => selectedPulangIds.includes(r.id));
   const handleToggleSelectAllPulang = () => {
-    if (isAllPulangSelected) {
-      setSelectedPulangIds([]);
-    } else {
-      setSelectedPulangIds(filteredPulang.map(r => r.id));
-    }
+    if (isAllPulangSelected) setSelectedPulangIds([]);
+    else setSelectedPulangIds(filteredPulang.map(r => r.id));
   };
-
   const handleToggleSelectPulang = (id) => {
-    setSelectedPulangIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
+    setSelectedPulangIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
-
   const handleDeleteSelectedPulang = () => {
     if (selectedPulangIds.length === 0) return;
     showConfirm({
       title: 'HAPUS DATA PRESENSI PULANG',
-      message: `Apakah Anda yakin ingin menghapus ${selectedPulangIds.length} data presensi pulang terpilih? Data uji coba ini akan dibersihkan secara permanen dari database lokal & cloud.`,
+      message: `Hapus ${selectedPulangIds.length} data presensi pulang terpilih?`,
       type: 'warning',
       confirmText: `YA, HAPUS (${selectedPulangIds.length}) DATA`,
       cancelText: 'BATAL',
@@ -300,11 +330,10 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
       }
     });
   };
-
   const handleDeleteSinglePulang = (r) => {
     showConfirm({
       title: 'HAPUS PRESENSI PULANG',
-      message: `Apakah Anda yakin ingin menghapus data presensi pulang atas nama "${r.userName}" (${r.date} ${r.time})?`,
+      message: `Hapus data presensi pulang atas nama "${r.userName}" (${r.date} ${r.time})?`,
       type: 'warning',
       confirmText: 'YA, HAPUS',
       cancelText: 'BATAL',
@@ -315,9 +344,62 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
     });
   };
 
-  const handleSaveSettings = (e) => {
-    e.preventDefault();
-    updateSettings({ ...settings, gasWebhookUrl: gasUrlInput });
+  // Selection handlers for Dinas Luar
+  const isAllDinasLuarSelected = filteredDinasLuar.length > 0 && filteredDinasLuar.every(r => selectedDinasLuarIds.includes(r.id));
+  const handleToggleSelectAllDinasLuar = () => {
+    if (isAllDinasLuarSelected) setSelectedDinasLuarIds([]);
+    else setSelectedDinasLuarIds(filteredDinasLuar.map(r => r.id));
+  };
+  const handleToggleSelectDinasLuar = (id) => {
+    setSelectedDinasLuarIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+  const handleDeleteSelectedDinasLuar = () => {
+    if (selectedDinasLuarIds.length === 0) return;
+    showConfirm({
+      title: 'HAPUS DATA DINAS LUAR',
+      message: `Hapus ${selectedDinasLuarIds.length} data dinas luar terpilih?`,
+      type: 'warning',
+      confirmText: `YA, HAPUS (${selectedDinasLuarIds.length}) DATA`,
+      cancelText: 'BATAL',
+      onConfirm: async () => {
+        setIsDeletingRecords(true);
+        try {
+          await deleteAttendanceRecords(selectedDinasLuarIds);
+          setSelectedDinasLuarIds([]);
+        } finally {
+          setIsDeletingRecords(false);
+        }
+      }
+    });
+  };
+
+  // Selection handlers for Izin / Sakit / Cuti
+  const isAllIzinSelected = filteredIzinSakitCuti.length > 0 && filteredIzinSakitCuti.every(r => selectedIzinIds.includes(r.id));
+  const handleToggleSelectAllIzin = () => {
+    if (isAllIzinSelected) setSelectedIzinIds([]);
+    else setSelectedIzinIds(filteredIzinSakitCuti.map(r => r.id));
+  };
+  const handleToggleSelectIzin = (id) => {
+    setSelectedIzinIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+  const handleDeleteSelectedIzin = () => {
+    if (selectedIzinIds.length === 0) return;
+    showConfirm({
+      title: 'HAPUS DATA IZIN / SAKIT / CUTI',
+      message: `Hapus ${selectedIzinIds.length} data pengajuan izin/sakit/cuti terpilih?`,
+      type: 'warning',
+      confirmText: `YA, HAPUS (${selectedIzinIds.length}) DATA`,
+      cancelText: 'BATAL',
+      onConfirm: async () => {
+        setIsDeletingRecords(true);
+        try {
+          await deleteAttendanceRecords(selectedIzinIds);
+          setSelectedIzinIds([]);
+        } finally {
+          setIsDeletingRecords(false);
+        }
+      }
+    });
   };
 
   // Helper titles based on active tab
@@ -325,18 +407,38 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
     switch (activeTab) {
       case 'DASHBOARD':
         return {
-          title: 'Dashboard Ringkasan',
-          subtitle: 'Monitoring kehadiran harian, statistik kepegawaian & pemenuhan target'
+          title: 'Dashboard Ringkasan Presensi',
+          subtitle: 'Monitoring kehadiran harian, 3-shift, D3, dinas luar, izin/cuti & pemenuhan target'
         };
       case 'MASUK':
         return {
           title: 'Presensi Masuk',
-          subtitle: `Data presensi masuk pegawai (${attendanceCategory === 'SHIFT' ? 'Dinas Muter 3-Shift' : 'Dinas Harian'})`
+          subtitle: 'Data presensi masuk seluruh pegawai (Dinas Harian, 3-Shift, & D3)'
         };
       case 'PULANG':
         return {
           title: 'Presensi Pulang',
-          subtitle: `Data presensi pulang & durasi kerja (${attendanceCategory === 'SHIFT' ? 'Dinas Muter 3-Shift' : 'Dinas Harian'})`
+          subtitle: 'Data presensi pulang & kalkulasi durasi jam kerja pegawai'
+        };
+      case 'DINAS_LUAR':
+        return {
+          title: 'Presensi Dinas Luar',
+          subtitle: 'Daftar pengajuan tugas dinas luar instansi, lokasi GPS & bukti foto lapangan'
+        };
+      case 'IZIN_SAKIT_CUTI':
+        return {
+          title: 'Pengajuan Izin, Sakit & Cuti',
+          subtitle: 'Rekapitulasi permohonan izin kerja, surat keterangan sakit & cuti pegawai'
+        };
+      case 'D3':
+        return {
+          title: 'Presensi D3 / Tugas Khusus',
+          subtitle: 'Data presensi kegiatan tugas belajar / dinas program D3'
+        };
+      case 'REKAP_SEMUA_JENIS':
+        return {
+          title: 'Rekapitulasi Semua Jenis Presensi',
+          subtitle: 'Laporan perbandingan komprehensif kehadiran (Harian, Shift, D3, DL, Izin, Sakit, Cuti)'
         };
       case 'REKAP_ABSENSI':
         return {
@@ -395,32 +497,70 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
 
         {/* Category Switcher inside Sidebar */}
         <div className="admin-sidebar-category">
-          <span className="admin-category-label">Kategori Presensi:</span>
-          <div className="admin-category-toggle">
+          <span className="admin-category-label">Kategori / Filter Presensi:</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginTop: '6px' }}>
+            <button
+              type="button"
+              className={`admin-category-btn ${attendanceCategory === 'SEMUA' ? 'active-harian' : ''}`}
+              onClick={() => setAttendanceCategory('SEMUA')}
+              style={{ fontSize: '0.74rem', padding: '6px 8px', justifyContent: 'center' }}
+            >
+              <span>🌐</span>
+              <span>Semua</span>
+            </button>
             <button
               type="button"
               className={`admin-category-btn ${attendanceCategory === 'HARIAN' ? 'active-harian' : ''}`}
               onClick={() => setAttendanceCategory('HARIAN')}
+              style={{ fontSize: '0.74rem', padding: '6px 8px', justifyContent: 'center' }}
             >
               <span>🏢</span>
-              <span>Dinas Harian (41 Jam)</span>
+              <span>Harian</span>
             </button>
             <button
               type="button"
               className={`admin-category-btn ${attendanceCategory === 'SHIFT' ? 'active-shift' : ''}`}
               onClick={() => setAttendanceCategory('SHIFT')}
+              style={{ fontSize: '0.74rem', padding: '6px 8px', justifyContent: 'center' }}
             >
               <span>🔄</span>
-              <span>Dinas Muter (3-Shift)</span>
+              <span>3-Shift</span>
+            </button>
+            <button
+              type="button"
+              className={`admin-category-btn ${attendanceCategory === 'D3' ? 'active-harian' : ''}`}
+              onClick={() => setAttendanceCategory('D3')}
+              style={{ fontSize: '0.74rem', padding: '6px 8px', justifyContent: 'center' }}
+            >
+              <span>💼</span>
+              <span>D3</span>
+            </button>
+            <button
+              type="button"
+              className={`admin-category-btn ${attendanceCategory === 'DINAS_LUAR' ? 'active-harian' : ''}`}
+              onClick={() => setAttendanceCategory('DINAS_LUAR')}
+              style={{ fontSize: '0.74rem', padding: '6px 8px', justifyContent: 'center' }}
+            >
+              <span>✈️</span>
+              <span>Dinas Luar</span>
+            </button>
+            <button
+              type="button"
+              className={`admin-category-btn ${attendanceCategory === 'IZIN_SAKIT_CUTI' ? 'active-harian' : ''}`}
+              onClick={() => setAttendanceCategory('IZIN_SAKIT_CUTI')}
+              style={{ fontSize: '0.74rem', padding: '6px 8px', justifyContent: 'center' }}
+            >
+              <span>📝</span>
+              <span>Izin/Cuti</span>
             </button>
           </div>
         </div>
 
         {/* Sidebar Navigation Items */}
         <nav className="admin-sidebar-nav">
-          {/* Group 1: Menu Utama */}
+          {/* Group 1: Presensi & Aktivitas */}
           <div className="admin-nav-group">
-            <div className="admin-nav-group-title">Menu Utama</div>
+            <div className="admin-nav-group-title">Presensi & Aktivitas</div>
             <div className="admin-nav-items">
               <button
                 type="button"
@@ -456,6 +596,42 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                 </div>
                 <span className="admin-nav-badge">{pulangRecords.length}</span>
               </button>
+
+              <button
+                type="button"
+                className={`admin-nav-item ${activeTab === 'DINAS_LUAR' ? 'active' : ''}`}
+                onClick={() => setActiveTab('DINAS_LUAR')}
+              >
+                <div className="admin-nav-item-left">
+                  <Plane size={18} />
+                  <span>Dinas Luar</span>
+                </div>
+                <span className="admin-nav-badge" style={{ backgroundColor: '#FEF3C7', color: '#D97706' }}>{dinasLuarRecords.length}</span>
+              </button>
+
+              <button
+                type="button"
+                className={`admin-nav-item ${activeTab === 'IZIN_SAKIT_CUTI' ? 'active' : ''}`}
+                onClick={() => setActiveTab('IZIN_SAKIT_CUTI')}
+              >
+                <div className="admin-nav-item-left">
+                  <FileText size={18} />
+                  <span>Izin, Sakit & Cuti</span>
+                </div>
+                <span className="admin-nav-badge" style={{ backgroundColor: '#F3E8FF', color: '#9333EA' }}>{izinSakitCutiRecords.length}</span>
+              </button>
+
+              <button
+                type="button"
+                className={`admin-nav-item ${activeTab === 'D3' ? 'active' : ''}`}
+                onClick={() => setActiveTab('D3')}
+              >
+                <div className="admin-nav-item-left">
+                  <Briefcase size={18} />
+                  <span>Presensi D3</span>
+                </div>
+                <span className="admin-nav-badge" style={{ backgroundColor: '#ECFDF5', color: '#059669' }}>{d3Records.length}</span>
+              </button>
             </div>
           </div>
 
@@ -463,6 +639,17 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
           <div className="admin-nav-group">
             <div className="admin-nav-group-title">Rekapitulasi Laporan</div>
             <div className="admin-nav-items">
+              <button
+                type="button"
+                className={`admin-nav-item ${activeTab === 'REKAP_SEMUA_JENIS' ? 'active' : ''}`}
+                onClick={() => setActiveTab('REKAP_SEMUA_JENIS')}
+              >
+                <div className="admin-nav-item-left">
+                  <Layers size={18} />
+                  <span>Rekap Semua Jenis</span>
+                </div>
+              </button>
+
               <button
                 type="button"
                 className={`admin-nav-item ${activeTab === 'REKAP_ABSENSI' ? 'active' : ''}`}
@@ -480,7 +667,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                 onClick={() => setActiveTab('REKAP_TOTAL_MINGGU')}
               >
                 <div className="admin-nav-item-left">
-                  <Layers size={18} />
+                  <Calendar size={18} />
                   <span>Rekap Total Perminggu</span>
                 </div>
               </button>
@@ -491,7 +678,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                 onClick={() => setActiveTab('REKAP_BULAN')}
               >
                 <div className="admin-nav-item-left">
-                  <Calendar size={18} />
+                  <FileSpreadsheet size={18} />
                   <span>Rekap Bulanan</span>
                 </div>
               </button>
@@ -645,45 +832,65 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
           {/* TAB 0: DASHBOARD OVERVIEW (HALAMAN UTAMA) */}
           {activeTab === 'DASHBOARD' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-              {/* Metric Stats Cards */}
-              <section className="admin-stats-grid">
+              {/* Metric Stats Cards - Semua Jenis Presensi */}
+              <section className="admin-stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
                 <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('DATA_PEGAWAI')}>
                   <div>
-                    <span className="metric-label">Total Pegawai Terdaftar</span>
+                    <span className="metric-label">Total Pegawai</span>
                     <div className="metric-value">{totalEmployees}</div>
                   </div>
                   <div className="metric-icon-box" style={{ backgroundColor: '#EFF6FF', color: '#3B82F6' }}>
-                    <Users size={24} />
+                    <Users size={22} />
                   </div>
                 </div>
 
                 <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('MASUK')}>
                   <div>
-                    <span className="metric-label">Hadir Tepat Waktu ({attendanceCategory === 'SHIFT' ? 'Shift' : 'Harian'})</span>
-                    <div className="metric-value" style={{ color: '#059669' }}>{onTimeCount}</div>
+                    <span className="metric-label">Presensi Masuk</span>
+                    <div className="metric-value" style={{ color: '#059669' }}>{masukRecords.length}</div>
                   </div>
                   <div className="metric-icon-box" style={{ backgroundColor: '#ECFDF5', color: '#059669' }}>
-                    <CheckCircle2 size={24} />
+                    <Sun size={22} />
                   </div>
                 </div>
 
-                <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('MASUK')}>
+                <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('PULANG')}>
                   <div>
-                    <span className="metric-label">Terlambat ({attendanceCategory === 'SHIFT' ? 'Shift' : 'Harian'})</span>
-                    <div className="metric-value" style={{ color: '#D97706' }}>{lateCount}</div>
+                    <span className="metric-label">Presensi Pulang</span>
+                    <div className="metric-value" style={{ color: '#0284C7' }}>{pulangRecords.length}</div>
+                  </div>
+                  <div className="metric-icon-box" style={{ backgroundColor: '#E0F2FE', color: '#0284C7' }}>
+                    <Sunset size={22} />
+                  </div>
+                </div>
+
+                <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('DINAS_LUAR')}>
+                  <div>
+                    <span className="metric-label">Dinas Luar</span>
+                    <div className="metric-value" style={{ color: '#D97706' }}>{dinasLuarRecords.length}</div>
                   </div>
                   <div className="metric-icon-box" style={{ backgroundColor: '#FEF3C7', color: '#D97706' }}>
-                    <Clock size={24} />
+                    <Plane size={22} />
                   </div>
                 </div>
 
-                <div className="metric-card">
+                <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('IZIN_SAKIT_CUTI')}>
                   <div>
-                    <span className="metric-label">Izin / Cuti / Sakit</span>
-                    <div className="metric-value" style={{ color: '#9333EA' }}>{leaveCount}</div>
+                    <span className="metric-label">Izin / Sakit / Cuti</span>
+                    <div className="metric-value" style={{ color: '#9333EA' }}>{izinSakitCutiRecords.length}</div>
                   </div>
                   <div className="metric-icon-box" style={{ backgroundColor: '#F3E8FF', color: '#9333EA' }}>
-                    <Calendar size={24} />
+                    <FileText size={22} />
+                  </div>
+                </div>
+
+                <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('D3')}>
+                  <div>
+                    <span className="metric-label">Presensi D3</span>
+                    <div className="metric-value" style={{ color: '#0F766E' }}>{d3Records.length}</div>
+                  </div>
+                  <div className="metric-icon-box" style={{ backgroundColor: '#CCFBF1', color: '#0F766E' }}>
+                    <Briefcase size={22} />
                   </div>
                 </div>
               </section>
@@ -692,6 +899,12 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
               <div style={{
                 background: attendanceCategory === 'SHIFT' 
                   ? 'linear-gradient(135deg, #7C3AED, #4F46E5)' 
+                  : attendanceCategory === 'DINAS_LUAR'
+                  ? 'linear-gradient(135deg, #D97706, #B45309)'
+                  : attendanceCategory === 'IZIN_SAKIT_CUTI'
+                  ? 'linear-gradient(135deg, #9333EA, #7E22CE)'
+                  : attendanceCategory === 'D3'
+                  ? 'linear-gradient(135deg, #0D9488, #0F766E)'
                   : 'linear-gradient(135deg, #00838F, #006064)',
                 borderRadius: '16px',
                 padding: '20px 24px',
@@ -701,27 +914,28 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                 alignItems: 'center',
                 flexWrap: 'wrap',
                 gap: '14px',
-                boxShadow: attendanceCategory === 'SHIFT'
-                  ? '0 6px 20px rgba(124, 58, 237, 0.25)'
-                  : '0 6px 20px rgba(0, 131, 143, 0.25)'
+                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.15)'
               }}>
                 <div>
                   <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: 800 }}>
-                    {attendanceCategory === 'SHIFT' ? '🔄 Mode Presensi: Dinas Muter (3-Shift)' : '🏢 Mode Presensi: Dinas Harian (41 Jam / Minggu)'}
+                    {attendanceCategory === 'SHIFT' ? '🔄 Filter Aktif: Dinas Muter (3-Shift)' :
+                     attendanceCategory === 'DINAS_LUAR' ? '✈️ Filter Aktif: Presensi Dinas Luar' :
+                     attendanceCategory === 'IZIN_SAKIT_CUTI' ? '📝 Filter Aktif: Izin, Sakit & Cuti' :
+                     attendanceCategory === 'D3' ? '💼 Filter Aktif: Presensi Program D3' :
+                     attendanceCategory === 'HARIAN' ? '🏢 Filter Aktif: Dinas Harian (Pagi)' :
+                     '🌐 Filter Aktif: Semua Jenis Presensi & Kepegawaian'}
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.84rem', opacity: 0.9 }}>
-                    {attendanceCategory === 'SHIFT' 
-                      ? 'Shift Pagi (07.00-14.00), Shift Sore (14.00-21.00), Shift Malam (21.00-07.00). Otomatis dihitung sesuai target per shift.'
-                      : 'Target Jam Kerja Harian: 41 Jam per Minggu (Senin s/d Sabtu). Terintegrasi langsung dengan Rekap M1 - M5.'}
+                    Menampilkan rekapan seluruh aktivitas presensi pegawai secara real-time. Terintegrasi dengan database cloud dan rekapitulasi multi-format.
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('REKAP_ABSENSI')}
+                    onClick={() => setActiveTab('REKAP_SEMUA_JENIS')}
                     style={{
                       background: '#FFFFFF',
-                      color: attendanceCategory === 'SHIFT' ? '#6D28D9' : '#006064',
+                      color: '#0F172A',
                       border: 'none',
                       borderRadius: '8px',
                       padding: '9px 18px',
@@ -730,41 +944,41 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                       cursor: 'pointer'
                     }}
                   >
-                    Buka Rekap Mingguan →
+                    Buka Rekap Semua Jenis →
                   </button>
                 </div>
               </div>
 
-              {/* 2 Feed Cards: Presensi Masuk & Pulang Terakhir */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px' }}>
+              {/* 4 Feed Cards: Masuk, Pulang, Dinas Luar & Izin/Cuti */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
                 {/* Masuk Feed */}
-                <div className="table-card" style={{ padding: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                    <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#00838F', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Sun size={18} /> Presensi Masuk Hari Ini
+                <div className="table-card" style={{ padding: '18px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#00838F', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Sun size={17} /> Presensi Masuk Hari Ini
                     </h4>
                     <button 
                       type="button" 
                       onClick={() => setActiveTab('MASUK')} 
-                      style={{ background: 'none', border: 'none', color: '#00838F', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ background: 'none', border: 'none', color: '#00838F', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Lihat Semua ({masukRecords.length}) →
                     </button>
                   </div>
 
                   {masukRecords.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '28px 16px', color: '#94A3B8', fontSize: '0.85rem' }}>
-                      Belum ada pegawai yang absen masuk hari ini.
+                    <div style={{ textAlign: 'center', padding: '24px 12px', color: '#94A3B8', fontSize: '0.82rem' }}>
+                      Belum ada data masuk.
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {masukRecords.slice(0, 5).map(r => (
-                        <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {masukRecords.slice(0, 4).map(r => (
+                        <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1E293B' }}>{r.userName}</div>
-                            <div style={{ fontSize: '0.74rem', color: '#64748B' }}>{r.date} • Jam: {r.time}</div>
+                            <div style={{ fontWeight: 700, fontSize: '0.84rem', color: '#1E293B' }}>{r.userName}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748B' }}>{r.date} • {r.time} ({r.type})</div>
                           </div>
-                          <span className={`badge-status ${r.isLate ? 'late' : 'ontime'}`}>
+                          <span className={`badge-status ${r.isLate ? 'late' : 'ontime'}`} style={{ fontSize: '0.7rem' }}>
                             {r.isLate ? 'Terlambat' : 'Tepat Waktu'}
                           </span>
                         </div>
@@ -774,40 +988,114 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                 </div>
 
                 {/* Pulang Feed */}
-                <div className="table-card" style={{ padding: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                    <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#7C3AED', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Sunset size={18} /> Presensi Pulang Hari Ini
+                <div className="table-card" style={{ padding: '18px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0284C7', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Sunset size={17} /> Presensi Pulang Hari Ini
                     </h4>
                     <button 
                       type="button" 
                       onClick={() => setActiveTab('PULANG')} 
-                      style={{ background: 'none', border: 'none', color: '#7C3AED', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ background: 'none', border: 'none', color: '#0284C7', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Lihat Semua ({pulangRecords.length}) →
                     </button>
                   </div>
 
                   {pulangRecords.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '28px 16px', color: '#94A3B8', fontSize: '0.85rem' }}>
-                      Belum ada pegawai yang absen pulang hari ini.
+                    <div style={{ textAlign: 'center', padding: '24px 12px', color: '#94A3B8', fontSize: '0.82rem' }}>
+                      Belum ada data pulang.
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {pulangRecords.slice(0, 5).map(r => (
-                        <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {pulangRecords.slice(0, 4).map(r => (
+                        <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1E293B' }}>{r.userName}</div>
-                            <div style={{ fontSize: '0.74rem', color: '#64748B' }}>{r.date} • Jam: {r.time}</div>
+                            <div style={{ fontWeight: 700, fontSize: '0.84rem', color: '#1E293B' }}>{r.userName}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748B' }}>{r.date} • {r.time}</div>
                           </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#059669' }}>
-                              {r.workDuration || '-'}
-                            </div>
-                            <span className="badge-status ontime" style={{ fontSize: '0.7rem' }}>
-                              Pulang Selesai
-                            </span>
+                          <span className="badge-status ontime" style={{ fontSize: '0.7rem' }}>
+                            {r.workDuration || 'Selesai'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Dinas Luar Feed */}
+                <div className="table-card" style={{ padding: '18px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#D97706', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Plane size={17} /> Dinas Luar Terkini
+                    </h4>
+                    <button 
+                      type="button" 
+                      onClick={() => setActiveTab('DINAS_LUAR')} 
+                      style={{ background: 'none', border: 'none', color: '#D97706', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Lihat Semua ({dinasLuarRecords.length}) →
+                    </button>
+                  </div>
+
+                  {dinasLuarRecords.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '24px 12px', color: '#94A3B8', fontSize: '0.82rem' }}>
+                      Belum ada presensi dinas luar.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {dinasLuarRecords.slice(0, 4).map(r => (
+                        <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#FFFBEB', borderRadius: '8px', border: '1px solid #FDE68A' }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.84rem', color: '#92400E' }}>{r.userName}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#B45309' }}>{r.date} • {r.location || 'Dinas Luar'}</div>
                           </div>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '3px 8px', borderRadius: '6px' }}>
+                            Dinas Luar
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Izin / Sakit / Cuti Feed */}
+                <div className="table-card" style={{ padding: '18px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#9333EA', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FileText size={17} /> Izin / Sakit / Cuti
+                    </h4>
+                    <button 
+                      type="button" 
+                      onClick={() => setActiveTab('IZIN_SAKIT_CUTI')} 
+                      style={{ background: 'none', border: 'none', color: '#9333EA', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Lihat Semua ({izinSakitCutiRecords.length}) →
+                    </button>
+                  </div>
+
+                  {izinSakitCutiRecords.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '24px 12px', color: '#94A3B8', fontSize: '0.82rem' }}>
+                      Belum ada pengajuan izin/cuti.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {izinSakitCutiRecords.slice(0, 4).map(r => (
+                        <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#FAF5FF', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.84rem', color: '#581C87' }}>{r.userName}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#7E22CE' }}>{r.date} • {r.reason || r.type}</div>
+                          </div>
+                          <span style={{ 
+                            fontSize: '0.7rem', 
+                            fontWeight: 700, 
+                            padding: '3px 8px', 
+                            borderRadius: '6px',
+                            backgroundColor: r.type === 'Cuti' ? '#E0E7FF' : r.type === 'Sakit' ? '#FEE2E2' : '#F3E8FF',
+                            color: r.type === 'Cuti' ? '#3730A3' : r.type === 'Sakit' ? '#991B1B' : '#6B21A8'
+                          }}>
+                            {r.type}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -816,7 +1104,21 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
               </div>
 
               {/* Quick Navigation Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                <div 
+                  className="table-card" 
+                  style={{ padding: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}
+                  onClick={() => setActiveTab('REKAP_SEMUA_JENIS')}
+                >
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#F0FDFA', color: '#0D9488', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Layers size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0F172A' }}>Rekap Semua Jenis</div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Komparatif Semua Presensi</div>
+                  </div>
+                </div>
+
                 <div 
                   className="table-card" 
                   style={{ padding: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}
@@ -826,8 +1128,8 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                     <Table size={20} />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0F172A' }}>Rekap Mingguan</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748B' }}>Format Tabel & Matriks</div>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0F172A' }}>Rekap Mingguan</div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Format Tabel & Matriks</div>
                   </div>
                 </div>
 
@@ -840,8 +1142,8 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                     <Calendar size={20} />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0F172A' }}>Rekap Bulanan</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748B' }}>Target Jam & Kehadiran</div>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0F172A' }}>Rekap Bulanan</div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Target Jam & Kehadiran</div>
                   </div>
                 </div>
 
@@ -854,8 +1156,8 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                     <Users size={20} />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0F172A' }}>Data Pegawai</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748B' }}>{totalEmployees} Pegawai Aktif</div>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0F172A' }}>Data Pegawai</div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B' }}>{totalEmployees} Pegawai Aktif</div>
                   </div>
                 </div>
 
@@ -868,8 +1170,8 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                     <Settings size={20} />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0F172A' }}>Pengaturan</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748B' }}>Lokasi, RustFS & Reset</div>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0F172A' }}>Pengaturan</div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748B' }}>Lokasi, RustFS & Reset</div>
                   </div>
                 </div>
               </div>
@@ -1493,6 +1795,593 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                       );
                     })
                   )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: PRESENSI DINAS LUAR */}
+        {activeTab === 'DINAS_LUAR' && (
+          <div className="table-card">
+            {/* Bulk Selection Bar */}
+            {selectedDinasLuarIds.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991B1B', fontWeight: 700, fontSize: '0.85rem' }}>
+                  <CheckSquare size={18} color="#DC2626" />
+                  <span>{selectedDinasLuarIds.length} data dinas luar dipilih</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDinasLuarIds([])}
+                    style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#475569', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Batal Pilih
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelectedDinasLuar}
+                    disabled={isDeletingRecords}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#DC2626', color: '#FFFFFF', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)' }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Hapus {selectedDinasLuarIds.length} Data Terpilih</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Toolbar Search */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F8FAFC', padding: '6px 14px', borderRadius: '10px', border: '1px solid #E2E8F0', width: '100%', maxWidth: '340px' }}>
+                <Search size={16} color="#64748B" />
+                <input
+                  type="text"
+                  placeholder="Cari pegawai, lokasi, atau tugas..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.85rem' }}
+                />
+              </div>
+
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#D97706', backgroundColor: '#FEF3C7', padding: '6px 14px', borderRadius: '8px' }}>
+                Total Presensi Dinas Luar: {filteredDinasLuar.length} Data
+              </div>
+            </div>
+
+            <div className="table-responsive">
+              <table className="admin-data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '40px', textAlign: 'center' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isAllDinasLuarSelected} 
+                        onChange={handleToggleSelectAllDinasLuar}
+                        title="Pilih Semua Data"
+                        style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#D97706' }}
+                      />
+                    </th>
+                    <th>Nama Pegawai</th>
+                    <th>Tanggal &amp; Jam</th>
+                    <th>Lokasi Tujuan</th>
+                    <th>Keterangan / Tugas</th>
+                    <th>Bukti Foto Lapangan</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'center', width: '80px' }}>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDinasLuar.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '28px', color: '#94A3B8' }}>
+                        Tidak ada data presensi dinas luar yang ditemukan.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredDinasLuar.map((r) => {
+                      const isSelected = selectedDinasLuarIds.includes(r.id);
+                      return (
+                        <tr key={r.id} style={{ backgroundColor: isSelected ? '#FFFBEB' : undefined }}>
+                          <td style={{ textAlign: 'center' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isSelected} 
+                              onChange={() => handleToggleSelectDinasLuar(r.id)}
+                              style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#D97706' }}
+                            />
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 700, color: '#0F172A' }}>{r.userName}</div>
+                            <div style={{ fontSize: '0.74rem', color: '#64748B' }}>{r.nip || r.email}</div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{r.date}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#D97706', fontWeight: 700 }}>{r.time} WIB</div>
+                          </td>
+                          <td style={{ fontWeight: 600, color: '#1E293B' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <MapPin size={14} color="#D97706" />
+                              <span>{r.location || 'Lokasi Dinas Luar'}</span>
+                            </div>
+                          </td>
+                          <td style={{ maxWidth: '240px', fontSize: '0.82rem', color: '#475569' }}>
+                            {r.reason || r.notes || 'Tugas Dinas Luar Instansi'}
+                          </td>
+                          <td>
+                            {r.evidenceUrl ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <img 
+                                  src={r.evidenceUrl} 
+                                  alt="Bukti Dinas Luar" 
+                                  onClick={() => setPreviewImageUrl(r.evidenceUrl)}
+                                  style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover', cursor: 'pointer', border: '1px solid #CBD5E1' }}
+                                  title="Klik untuk memperbesar foto"
+                                />
+                                <a href={r.evidenceUrl} target="_blank" rel="noreferrer" className="drive-link-btn" style={{ fontSize: '0.72rem' }}>
+                                  <ExternalLink size={11} />
+                                </a>
+                              </div>
+                            ) : '-'}
+                          </td>
+                          <td>
+                            <span style={{ backgroundColor: '#FEF3C7', color: '#B45309', padding: '3px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 700 }}>
+                              Dinas Luar
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                showConfirm({
+                                  title: 'HAPUS PRESENSI DINAS LUAR',
+                                  message: `Hapus data dinas luar atas nama "${r.userName}" (${r.date})?`,
+                                  type: 'warning',
+                                  confirmText: 'YA, HAPUS',
+                                  cancelText: 'BATAL',
+                                  onConfirm: async () => {
+                                    await deleteAttendanceRecords([r.id]);
+                                    setSelectedDinasLuarIds(prev => prev.filter(id => id !== r.id));
+                                  }
+                                });
+                              }}
+                              style={{
+                                background: '#FEE2E2',
+                                border: '1px solid #FECACA',
+                                borderRadius: '6px',
+                                color: '#DC2626',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                fontSize: '0.72rem',
+                                fontWeight: 700
+                              }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: IZIN, SAKIT & CUTI */}
+        {activeTab === 'IZIN_SAKIT_CUTI' && (
+          <div className="table-card">
+            {/* Bulk Selection Bar */}
+            {selectedIzinIds.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991B1B', fontWeight: 700, fontSize: '0.85rem' }}>
+                  <CheckSquare size={18} color="#DC2626" />
+                  <span>{selectedIzinIds.length} data permohonan dipilih</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIzinIds([])}
+                    style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#475569', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Batal Pilih
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelectedIzin}
+                    disabled={isDeletingRecords}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#DC2626', color: '#FFFFFF', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)' }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Hapus {selectedIzinIds.length} Data Terpilih</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Filter Pills & Search */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {['SEMUA', 'Izin', 'Sakit', 'Cuti'].map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setIzinFilterType(t)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      border: izinFilterType === t ? '1.5px solid #9333EA' : '1px solid #CBD5E1',
+                      backgroundColor: izinFilterType === t ? '#F3E8FF' : '#FFFFFF',
+                      color: izinFilterType === t ? '#6B21A8' : '#475569',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {t === 'SEMUA' ? 'Semua Pengajuan' : t}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F8FAFC', padding: '6px 14px', borderRadius: '10px', border: '1px solid #E2E8F0', width: '100%', maxWidth: '300px' }}>
+                <Search size={16} color="#64748B" />
+                <input
+                  type="text"
+                  placeholder="Cari pegawai atau keterangan..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.85rem' }}
+                />
+              </div>
+            </div>
+
+            <div className="table-responsive">
+              <table className="admin-data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '40px', textAlign: 'center' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isAllIzinSelected} 
+                        onChange={handleToggleSelectAllIzin}
+                        title="Pilih Semua Data"
+                        style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#9333EA' }}
+                      />
+                    </th>
+                    <th>Nama Pegawai</th>
+                    <th>Jenis Pengajuan</th>
+                    <th>Periode Tanggal</th>
+                    <th>Alasan / Keterangan</th>
+                    <th>Surat Bukti / Dokter</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'center', width: '80px' }}>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredIzinSakitCuti.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '28px', color: '#94A3B8' }}>
+                        Tidak ada data permohonan izin / sakit / cuti yang ditemukan.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredIzinSakitCuti.map((r) => {
+                      const isSelected = selectedIzinIds.includes(r.id);
+                      return (
+                        <tr key={r.id} style={{ backgroundColor: isSelected ? '#FAF5FF' : undefined }}>
+                          <td style={{ textAlign: 'center' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isSelected} 
+                              onChange={() => handleToggleSelectIzin(r.id)}
+                              style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#9333EA' }}
+                            />
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 700, color: '#0F172A' }}>{r.userName}</div>
+                            <div style={{ fontSize: '0.74rem', color: '#64748B' }}>{r.nip || r.email}</div>
+                          </td>
+                          <td>
+                            <span style={{ 
+                              padding: '3px 10px', 
+                              borderRadius: '6px', 
+                              fontSize: '0.76rem', 
+                              fontWeight: 800,
+                              backgroundColor: r.type === 'Cuti' ? '#E0E7FF' : r.type === 'Sakit' ? '#FEE2E2' : '#F3E8FF',
+                              color: r.type === 'Cuti' ? '#3730A3' : r.type === 'Sakit' ? '#991B1B' : '#6B21A8'
+                            }}>
+                              {r.type}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{r.startDate || r.date}</div>
+                            {r.endDate && r.endDate !== (r.startDate || r.date) && (
+                              <div style={{ fontSize: '0.74rem', color: '#64748B' }}>s/d {r.endDate}</div>
+                            )}
+                          </td>
+                          <td style={{ maxWidth: '240px', fontSize: '0.82rem', color: '#475569' }}>
+                            {r.reason || r.notes || '-'}
+                          </td>
+                          <td>
+                            {r.evidenceUrl ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <img 
+                                  src={r.evidenceUrl} 
+                                  alt="Surat Bukti" 
+                                  onClick={() => setPreviewImageUrl(r.evidenceUrl)}
+                                  style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover', cursor: 'pointer', border: '1px solid #CBD5E1' }}
+                                  title="Klik untuk melihat surat / bukti"
+                                />
+                                <a href={r.evidenceUrl} target="_blank" rel="noreferrer" className="drive-link-btn" style={{ fontSize: '0.72rem' }}>
+                                  <ExternalLink size={11} />
+                                </a>
+                              </div>
+                            ) : '-'}
+                          </td>
+                          <td>
+                            <span className="badge-status ontime" style={{ fontSize: '0.74rem' }}>
+                              Disetujui
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                showConfirm({
+                                  title: 'HAPUS PERMOHONAN',
+                                  message: `Hapus data pengajuan ${r.type} atas nama "${r.userName}"?`,
+                                  type: 'warning',
+                                  confirmText: 'YA, HAPUS',
+                                  cancelText: 'BATAL',
+                                  onConfirm: async () => {
+                                    await deleteAttendanceRecords([r.id]);
+                                    setSelectedIzinIds(prev => prev.filter(id => id !== r.id));
+                                  }
+                                });
+                              }}
+                              style={{
+                                background: '#FEE2E2',
+                                border: '1px solid #FECACA',
+                                borderRadius: '6px',
+                                color: '#DC2626',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                fontSize: '0.72rem',
+                                fontWeight: 700
+                              }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: PRESENSI D3 */}
+        {activeTab === 'D3' && (
+          <div className="table-card">
+            {/* Toolbar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F8FAFC', padding: '6px 14px', borderRadius: '10px', border: '1px solid #E2E8F0', width: '100%', maxWidth: '320px' }}>
+                <Search size={16} color="#64748B" />
+                <input
+                  type="text"
+                  placeholder="Cari pegawai D3..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.85rem' }}
+                />
+              </div>
+
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F766E', backgroundColor: '#CCFBF1', padding: '6px 14px', borderRadius: '8px' }}>
+                Total Presensi D3: {filteredD3.length} Data
+              </div>
+            </div>
+
+            <div className="table-responsive">
+              <table className="admin-data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Nama Pegawai</th>
+                    <th>NIP</th>
+                    <th>Tanggal</th>
+                    <th>Jam Masuk</th>
+                    <th>Bukti Foto</th>
+                    <th>Lokasi</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'center', width: '80px' }}>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredD3.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: '28px', color: '#94A3B8' }}>
+                        Tidak ada data presensi D3 yang ditemukan.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredD3.map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.timestamp}</td>
+                        <td style={{ fontWeight: 700, color: '#0F172A' }}>{r.userName}</td>
+                        <td style={{ fontSize: '0.75rem', color: '#64748B' }}>{r.nip || '-'}</td>
+                        <td style={{ fontWeight: 600 }}>{r.date}</td>
+                        <td style={{ fontWeight: 700, color: '#0F766E' }}>{r.time}</td>
+                        <td>
+                          {r.evidenceUrl ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <img 
+                                src={r.evidenceUrl} 
+                                alt="Bukti D3" 
+                                onClick={() => setPreviewImageUrl(r.evidenceUrl)}
+                                style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover', cursor: 'pointer', border: '1px solid #CBD5E1' }}
+                              />
+                              <a href={r.evidenceUrl} target="_blank" rel="noreferrer" className="drive-link-btn" style={{ fontSize: '0.72rem' }}>
+                                <ExternalLink size={11} />
+                              </a>
+                            </div>
+                          ) : '-'}
+                        </td>
+                        <td style={{ fontSize: '0.78rem', color: '#64748B' }}>{r.location || '-'}</td>
+                        <td>
+                          <span style={{ backgroundColor: '#CCFBF1', color: '#0F766E', padding: '3px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 700 }}>
+                            Hadir (D3)
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              showConfirm({
+                                title: 'HAPUS PRESENSI D3',
+                                message: `Hapus data presensi D3 atas nama "${r.userName}" (${r.date})?`,
+                                type: 'warning',
+                                confirmText: 'YA, HAPUS',
+                                cancelText: 'BATAL',
+                                onConfirm: async () => {
+                                  await deleteAttendanceRecords([r.id]);
+                                }
+                              });
+                            }}
+                            style={{
+                              background: '#FEE2E2',
+                              border: '1px solid #FECACA',
+                              borderRadius: '6px',
+                              color: '#DC2626',
+                              padding: '4px 8px',
+                              cursor: 'pointer',
+                              fontSize: '0.72rem',
+                              fontWeight: 700
+                            }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: REKAPITULASI SEMUA JENIS PRESENSI */}
+        {activeTab === 'REKAP_SEMUA_JENIS' && (
+          <div className="table-card" style={{ padding: '20px' }}>
+            {/* Header Toolbar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Bulan:</span>
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                    style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontWeight: 700, color: '#00838F', fontSize: '0.88rem' }}
+                  >
+                    {MONTH_OPTIONS.map(m => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Tahun:</span>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontWeight: 700, color: '#00838F', fontSize: '0.88rem' }}
+                  >
+                    {YEAR_OPTIONS.map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <button 
+                className="btn-excel-export"
+                onClick={() => handleExportExcel('SEMUA')}
+                style={{ padding: '9px 18px', fontSize: '0.88rem' }}
+              >
+                <FileSpreadsheet size={16} />
+                <span>Unduh Excel Rekap Semua Jenis</span>
+              </button>
+            </div>
+
+            {/* Table Komparatif Semua Jenis Presensi */}
+            <div className="table-responsive">
+              <table className="admin-data-table">
+                <thead>
+                  <tr style={{ backgroundColor: '#F8FAFC' }}>
+                    <th style={{ width: '40px', textAlign: 'center' }}>No</th>
+                    <th>Nama Pegawai</th>
+                    <th>NIP</th>
+                    <th style={{ textAlign: 'center' }}>Harian (H)</th>
+                    <th style={{ textAlign: 'center' }}>Shift (3-Shift)</th>
+                    <th style={{ textAlign: 'center' }}>D3</th>
+                    <th style={{ textAlign: 'center' }}>Dinas Luar (DL)</th>
+                    <th style={{ textAlign: 'center' }}>Izin (I)</th>
+                    <th style={{ textAlign: 'center' }}>Sakit (S)</th>
+                    <th style={{ textAlign: 'center' }}>Cuti (C)</th>
+                    <th style={{ textAlign: 'center' }}>Total Jam Kerja</th>
+                    <th style={{ textAlign: 'center' }}>Target (164 Jam)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employeeUsers.map((user, idx) => {
+                    const userRecs = allRecords.filter(r => r.email === user.email || r.userName === user.name);
+                    const hadirHarian = userRecs.filter(r => (r.type === 'Masuk' || r.type === 'HARIAN_MASUK') && r.category !== 'SHIFT').length;
+                    const hadirShift = userRecs.filter(r => r.type === 'Shift Masuk' || r.type === 'SHIFT_MASUK' || r.category === 'SHIFT').length;
+                    const hadirD3 = userRecs.filter(r => r.type === 'D3').length;
+                    const dinasLuar = userRecs.filter(r => r.type === 'Dinas Luar').length;
+                    const izin = userRecs.filter(r => r.type === 'Izin').length;
+                    const sakit = userRecs.filter(r => r.type === 'Sakit').length;
+                    const cuti = userRecs.filter(r => r.type === 'Cuti').length;
+
+                    let grandHours = 0;
+                    weeklyRecap.forEach(w => {
+                      const uSummary = w.users?.find(u => u.user.email === user.email) || {};
+                      grandHours += (uSummary.totalHours || 0);
+                    });
+
+                    const isTargetMet = grandHours >= 164;
+
+                    return (
+                      <tr key={user.id}>
+                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{idx + 1}</td>
+                        <td>
+                          <div style={{ fontWeight: 700, color: '#0F172A' }}>{user.name}</div>
+                          <div style={{ fontSize: '0.74rem', color: '#64748B' }}>{user.skpd || 'UPTD Puskesmas Cermee'}</div>
+                        </td>
+                        <td style={{ fontSize: '0.78rem', color: '#64748B' }}>{user.nip || '-'}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 700, color: '#059669' }}>{hadirHarian}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 700, color: '#7C3AED' }}>{hadirShift}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 700, color: '#0F766E' }}>{hadirD3}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 700, color: '#D97706' }}>{dinasLuar}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 700, color: '#2563EB' }}>{izin}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 700, color: '#DC2626' }}>{sakit}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 700, color: '#9333EA' }}>{cuti}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 800, color: '#00838F', fontSize: '0.95rem' }}>
+                          {parseFloat(grandHours.toFixed(2))} Jam
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span className={`badge-status ${isTargetMet ? 'target-met' : 'target-missed'}`}>
+                            {isTargetMet ? 'Tercapai' : 'Kurang'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2944,6 +3833,76 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
               >
                 Selesai &amp; Tutup
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PREVIEW FOTO / SURAT BUKTI */}
+      {previewImageUrl && (
+        <div 
+          onClick={() => setPreviewImageUrl(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            zIndex: 99999
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              backgroundColor: '#0F172A',
+              borderRadius: '16px',
+              padding: '12px',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center'
+            }}
+          >
+            <button
+              onClick={() => setPreviewImageUrl(null)}
+              style={{
+                position: 'absolute',
+                top: '-14px',
+                right: '-14px',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                backgroundColor: '#DC2626',
+                color: '#FFFFFF',
+                border: '2px solid #FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                zIndex: 10
+              }}
+            >
+              <CloseIcon size={18} />
+            </button>
+            <img 
+              src={previewImageUrl} 
+              alt="Bukti Dokumen / Foto" 
+              style={{
+                maxWidth: '100%',
+                maxHeight: '80vh',
+                borderRadius: '10px',
+                objectFit: 'contain'
+              }}
+            />
+            <div style={{ marginTop: '10px', color: '#94A3B8', fontSize: '0.8rem', textAlign: 'center' }}>
+              Klik di luar gambar atau tombol silang merah untuk menutup
             </div>
           </div>
         </div>

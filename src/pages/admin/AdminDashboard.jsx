@@ -156,6 +156,7 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
 
   const [googleDriveFolderUrlInput, setGoogleDriveFolderUrlInput] = useState(settings?.googleDriveFolderUrl || '');
   const [testingGoogleCloud, setTestingGoogleCloud] = useState(false);
+  const [showVercelTutorialModal, setShowVercelTutorialModal] = useState(false);
 
   const [rustfsEndpointInput, setRustfsEndpointInput] = useState(settings?.rustfsEndpoint || '');
   const [rustfsBucketInput, setRustfsBucketInput] = useState(settings?.rustfsBucket || 'bukti-presensi');
@@ -2462,6 +2463,27 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
                     >
                       {testingGoogleCloud ? 'Menguji Database...' : '🧪 Uji Koneksi Vercel Postgres & Drive'}
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowVercelTutorialModal(true)}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        color: '#065F46',
+                        border: '1px solid #A7F3D0',
+                        borderRadius: '8px',
+                        padding: '11px 18px',
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <FileText size={16} color="#059669" />
+                      <span>📖 Panduan Setup Vercel & Custom Domain</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -2799,17 +2821,157 @@ export function AdminDashboard({ onSwitchToUser, onLogout, currentPath, onNaviga
               <button
                 onClick={() => setShowGasCodeModal(false)}
                 style={{
-                  backgroundColor: '#00838F',
+                  backgroundColor: '#2563EB',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '8px',
-                  padding: '10px 20px',
+                  padding: '10px 22px',
                   fontWeight: 700,
                   fontSize: '0.88rem',
                   cursor: 'pointer'
                 }}
               >
-                Tutup Panduan
+                Selesai &amp; Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PANDUAN SETUP VERCEL POSTGRES & CUSTOM DOMAIN */}
+      {showVercelTutorialModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            zIndex: 9999
+          }}
+        >
+          <div 
+            className="auth-card-animate"
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '720px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F0FDF4' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#15803D' }}>
+                  <Database size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#14532D', margin: 0 }}>
+                    Panduan Setup Vercel Postgres & Custom Domain
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: '#166534', margin: 0 }}>
+                    Langkah mudah menghubungkan cloud database SQL & memasang domain instansi
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowVercelTutorialModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '6px' }}
+              >
+                <CloseIcon size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body: 3 Step Cards */}
+            <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              
+              {/* Card 1: Setup Vercel Postgres */}
+              <div style={{ border: '1.5px solid #E2E8F0', borderRadius: '14px', padding: '16px 18px', backgroundColor: '#F8FAFC' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ backgroundColor: '#059669', color: '#FFF', fontSize: '0.75rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px' }}>
+                    BAGIAN 1
+                  </span>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1E293B' }}>
+                    Setup Database Vercel Postgres (Neon Serverless)
+                  </h4>
+                </div>
+                <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '0.82rem', color: '#475569', lineHeight: 1.6 }}>
+                  <li>Login ke dashboard <a href="https://vercel.com" target="_blank" rel="noreferrer" style={{ color: '#0284C7', fontWeight: 700 }}>Vercel</a> dan buka project <strong>si-absen</strong>.</li>
+                  <li>Klik tab <strong>Storage</strong> di navigasi atas &gt; Klik <strong>Create Database</strong> &gt; Pilih <strong>Postgres (Neon)</strong>.</li>
+                  <li>Beri nama database (misal: <code>si-absen-db</code>), pilih region terdekat (<strong>Singapore / sin1</strong>), lalu klik <strong>Create</strong>.</li>
+                  <li>Klik <strong>Connect to Project</strong> &gt; Pilih project Anda. (Vercel otomatis membuat env variable <code>POSTGRES_URL</code>).</li>
+                  <li>Masuk ke tab <strong>Deployments</strong> &gt; Klik titik tiga <code>...</code> &gt; <strong>Redeploy</strong>. Tabel database otomatis terbuat secara otomatis!</li>
+                </ol>
+              </div>
+
+              {/* Card 2: Setup Custom Domain */}
+              <div style={{ border: '1.5px solid #E2E8F0', borderRadius: '14px', padding: '16px 18px', backgroundColor: '#F0F9FF' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ backgroundColor: '#0284C7', color: '#FFF', fontSize: '0.75rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px' }}>
+                    BAGIAN 2
+                  </span>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0C4A6E' }}>
+                    Pasang Custom Domain Instansi (Gratis SSL HTTPS)
+                  </h4>
+                </div>
+                <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '0.82rem', color: '#0369A1', lineHeight: 1.6 }}>
+                  <li>Di project Vercel, buka tab <strong>Settings</strong> &gt; pilih menu <strong>Domains</strong>.</li>
+                  <li>Ketik nama subdomain atau domain yang diinginkan (contoh: <code>absen.smkn1cermee.sch.id</code> atau <code>presensi.kantor.com</code>) lalu klik <strong>Add</strong>.</li>
+                  <li>Buka DNS Manager di penyedia domain Anda (Cloudflare, Niagahoster, Domainesia, dll), lalu tambahkan DNS Record:
+                    <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #BAE6FD', padding: '8px 12px', borderRadius: '8px', marginTop: '6px', fontSize: '0.78rem', fontFamily: 'monospace' }}>
+                      <strong>Untuk Subdomain:</strong> Tipe: <code>CNAME</code> | Name: <code>absen</code> | Target: <code>cname.vercel-dns.com</code><br />
+                      <strong>Untuk Domain Utama:</strong> Tipe: <code>A</code> | Name: <code>@</code> | Target: <code>76.76.21.21</code>
+                    </div>
+                  </li>
+                  <li>Tunggu 1-5 menit, status domain di Vercel akan otomatis centang hijau (<strong>Valid Configuration</strong>) dengan sertifikat SSL aktif gratis!</li>
+                </ol>
+              </div>
+
+              {/* Card 3: Setup Google Drive Foto */}
+              <div style={{ border: '1.5px solid #E2E8F0', borderRadius: '14px', padding: '16px 18px', backgroundColor: '#FEFCE8' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ backgroundColor: '#CA8A04', color: '#FFF', fontSize: '0.75rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px' }}>
+                    BAGIAN 3
+                  </span>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#713F12' }}>
+                    Link Folder Google Drive untuk Penyimpanan Foto
+                  </h4>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#854D0E', lineHeight: 1.5 }}>
+                  Buat 1 folder di Google Drive Anda, atur hak akses menjadi <strong>"Siapa saja yang memiliki link" (Viewer)</strong>, lalu tempelkan link folder tersebut pada kolom input di panel pengaturan di atas.
+                </p>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '14px 24px', borderTop: '1px solid #E2E8F0', backgroundColor: '#F8FAFC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                File panduan lengkap tersedia di: <code>docs/PANDUAN_SETUP_VERCEL_POSTGRES_DAN_DOMAIN.md</code>
+              </div>
+              <button
+                onClick={() => setShowVercelTutorialModal(false)}
+                style={{
+                  backgroundColor: '#059669',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '10px 22px',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Mengerti &amp; Tutup
               </button>
             </div>
           </div>

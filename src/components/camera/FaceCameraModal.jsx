@@ -538,47 +538,6 @@ export function FaceCameraModal({
         {/* Top Handle Indicator */}
         <div style={{ width: '40px', height: '4px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px' }} />
 
-        {/* Profile Avatar Circle in Bottom Card */}
-        <div 
-          style={{
-            position: 'absolute',
-            top: '-42px',
-            width: '84px',
-            height: '84px',
-            borderRadius: '50%',
-            backgroundColor: '#0F213E',
-            border: `3px solid ${matchError ? '#EF4444' : '#1E3A8A'}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-            transition: 'border-color 0.3s ease'
-          }}
-        >
-          <div 
-            style={{
-              width: '74px',
-              height: '74px',
-              borderRadius: '50%',
-              backgroundColor: '#1E293B',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden'
-            }}
-          >
-            {currentUser?.photo ? (
-              <img 
-                src={currentUser.photo} 
-                alt={employeeName} 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-              />
-            ) : (
-              <User size={38} color="#94A3B8" />
-            )}
-          </div>
-        </div>
-
         {/* Employee Info Box Container */}
         <div 
           style={{

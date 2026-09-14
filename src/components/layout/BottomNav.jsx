@@ -1,33 +1,46 @@
 import React from 'react';
-import { LayoutGrid, Fingerprint, History, User } from 'lucide-react';
+import { LayoutGrid, Fingerprint, History } from 'lucide-react';
 
 export function BottomNav({ activeTab, onTabChange, onFingerprintClick }) {
   return (
-    <nav className="sipp-bottom-nav">
-      <button 
-        className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
-        onClick={() => onTabChange('home')}
-        title="Beranda"
-      >
-        <LayoutGrid size={24} />
-      </button>
+    <div className="ios-bottom-nav-container">
+      <nav className="ios-floating-dock">
+        <button 
+          type="button"
+          className={`ios-dock-item ${activeTab === 'home' ? 'active' : ''}`}
+          onClick={() => onTabChange('home')}
+          title="Beranda"
+        >
+          <LayoutGrid size={22} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
+          <span className="ios-dock-label">Beranda</span>
+        </button>
 
-      {/* Floating Fingerprint Action Button */}
-      <button 
-        className="fab-fingerprint" 
-        onClick={onFingerprintClick}
-        title="Tekan untuk Absen / Presensi"
-      >
-        <Fingerprint size={34} strokeWidth={2.2} />
-      </button>
+        {/* Floating Pulsing Fingerprint Action Button */}
+        <div className="ios-fab-wrapper">
+          <button 
+            type="button"
+            className="ios-fab-fingerprint" 
+            onClick={onFingerprintClick}
+            title="Tekan untuk Absen / Presensi Cepat"
+          >
+            <div className="ios-fab-pulse-ring" />
+            <div className="ios-fab-inner">
+              <Fingerprint size={32} strokeWidth={2.4} />
+            </div>
+          </button>
+        </div>
 
-      <button 
-        className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
-        onClick={() => onTabChange('history')}
-        title="Riwayat Presensi"
-      >
-        <History size={24} />
-      </button>
-    </nav>
+        <button 
+          type="button"
+          className={`ios-dock-item ${activeTab === 'history' ? 'active' : ''}`}
+          onClick={() => onTabChange('history')}
+          title="Riwayat Presensi"
+        >
+          <History size={22} strokeWidth={activeTab === 'history' ? 2.5 : 2} />
+          <span className="ios-dock-label">Riwayat</span>
+        </button>
+      </nav>
+    </div>
   );
 }
+

@@ -1,5 +1,10 @@
-import React, { useState } from 'react';
-import { Calendar, RefreshCw, Search, LogIn, LogOut, CalendarDays, User, ExternalLink, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  Calendar, RefreshCw, Search, LogIn, LogOut, CalendarDays, 
+  User, ExternalLink, ShieldCheck, Clock, ChevronRight, 
+  Sparkles, Activity, CheckCircle2, ArrowUpRight, Plane, 
+  Briefcase, Repeat, FileText, Sun, Sunset, Moon, MapPin
+} from 'lucide-react';
 import { SIPPHeader } from '../../components/layout/SIPPHeader';
 import { RunningBanner } from '../../components/layout/RunningBanner';
 import { BottomNav } from '../../components/layout/BottomNav';
@@ -34,10 +39,36 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
   const [activeShiftType, setActiveShiftType] = useState(null); // 'PAGI' | 'SORE' | 'MALAM'
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [leaveInitialType, setLeaveInitialType] = useState('Izin');
-
-  const todayFormatted = formatIndonesianDate(new Date());
-
   const [attendanceType, setAttendanceType] = useState('Masuk');
+
+  // Real-time ticking clock for iOS Widget Hero
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const hours = currentTime.getHours();
+  const timeString = currentTime.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).replace(/\./g, ':');
+
+  // Greeting helper
+  const getGreeting = () => {
+    if (hours >= 4 && hours < 11) return { text: 'Selamat Pagi', icon: '☀️' };
+    if (hours >= 11 && hours < 15) return { text: 'Selamat Siang', icon: '🌤️' };
+    if (hours >= 15 && hours < 18) return { text: 'Selamat Sore', icon: '🌇' };
+    return { text: 'Selamat Malam', icon: '🌙' };
+  };
+
+  const greeting = getGreeting();
+  const todayFormatted = formatIndonesianDate(currentTime);
 
   const handleOpenMasukCamera = (type = 'Masuk', category = 'HARIAN', shiftType = null) => {
     setCameraMode('MASUK');
@@ -91,9 +122,45 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
     setActiveTab(tab);
   };
 
+  // Determine current working status
+  const getWorkStatus = () => {
+    if (todayCheckIn?.type === 'Dinas Luar') {
+      return {
+        label: 'Dinas Luar Aktif',
+        badgeClass: 'status-badge-amber',
+        desc: 'Tuntas hadir dinas luar',
+        dotColor: '#F59E0B'
+      };
+    }
+    if (todayCheckOut) {
+      return {
+        label: 'Selesai Bertugas',
+        badgeClass: 'status-badge-blue',
+        desc: `Pulang pukul ${todayCheckOut.time}`,
+        dotColor: '#3B82F6'
+      };
+    }
+    if (todayCheckIn) {
+      return {
+        label: 'Sedang Bertugas',
+        badgeClass: 'status-badge-emerald',
+        desc: `Masuk pukul ${todayCheckIn.time}`,
+        dotColor: '#10B981'
+      };
+    }
+    return {
+      label: 'Belum Presensi',
+      badgeClass: 'status-badge-slate',
+      desc: 'Silakan lakukan presensi masuk',
+      dotColor: '#94A3B8'
+    };
+  };
+
+  const workStatus = getWorkStatus();
+
   return (
     <div className="app-container">
-      {/* Sidebar Drawer Menu (Matching Screenshot 3) */}
+      {/* Sidebar Drawer Menu */}
       <SidebarDrawer
         isOpen={showSidebarDrawer}
         onClose={() => setShowSidebarDrawer(false)}
@@ -106,117 +173,236 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
       <div className={`app-pages-slider tab-${activeTab}`}>
         {/* PANE 1: Beranda (Home Dashboard) */}
         <div className="app-page-pane pane-home">
-          {/* SIPP Header */}
+          {/* iOS Header */}
           <SIPPHeader 
             onOpenMenu={() => setShowSidebarDrawer(true)} 
             onSwitchToAdmin={onSwitchToAdmin} 
           />
 
-          {/* Integrity Slogan Running Banner */}
+          {/* Running Banner */}
           <RunningBanner />
 
           {/* Main Content Area */}
-          <main className="mobile-content">
-            {/* 1. Profile Card Matching SIPP Screenshot */}
-            <div className="profile-card">
-              <div 
-                className="avatar-wrapper"
-                onClick={() => setShowUpdatePhotoModal(true)}
-                style={{ cursor: 'pointer', overflow: 'hidden' }}
-                title="Klik untuk ubah foto profil"
-              >
-                {currentUser?.photo ? (
-                  <img 
-                    src={currentUser.photo} 
-                    alt={currentUser.name} 
-                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
-                  />
-                ) : (
-                  <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
-                    <circle cx="50" cy="50" r="48" fill="#F1F5F9" stroke="#00ACC1" strokeWidth="3" />
-                    <circle cx="50" cy="40" r="18" fill="#94A3B8" />
-                    <path d="M 22 84 A 30 28 0 0 1 78 84 Z" fill="#94A3B8" />
-                  </svg>
-                )}
-                <span className="online-dot" />
+          <main className="mobile-content ios-styled-content">
+            {/* 1. iOS HERO CLOCK & PROFILE WIDGET */}
+            <div className="ios-hero-widget-card">
+              <div className="ios-hero-top-row">
+                <div 
+                  className="ios-hero-avatar-wrapper"
+                  onClick={() => setShowUpdatePhotoModal(true)}
+                  title="Klik untuk ubah foto profil"
+                >
+                  {currentUser?.photo ? (
+                    <img 
+                      src={currentUser.photo} 
+                      alt={currentUser.name} 
+                      className="ios-hero-avatar-img"
+                    />
+                  ) : (
+                    <div className="ios-hero-avatar-placeholder">
+                      <User size={28} color="#00838F" />
+                    </div>
+                  )}
+                  <span className="ios-hero-online-dot" />
+                </div>
+
+                <div className="ios-hero-user-details">
+                  <span className="ios-greeting-text">
+                    {greeting.text} {greeting.icon}
+                  </span>
+                  <h2 className="ios-user-name">
+                    {currentUser?.name || 'Pegawai'}
+                  </h2>
+                  <div className="ios-nip-skpd-row">
+                    <span className="ios-user-nip">NIP: {currentUser?.nip || '-'}</span>
+                    <span className="ios-skpd-tag">
+                      <MapPin size={11} />
+                      {currentUser?.skpd || 'UPTD Puskesmas Cermee'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="profile-info">
-                <h2 className="profile-name">{currentUser?.name || 'Pegawai'}</h2>
-                <span className="profile-nip">{currentUser?.nip || '-'}</span>
-                
-                <div className="skpd-badge">
-                  <div className="skpd-icon-box">
-                    <CalendarDays size={18} />
+              {/* Dynamic Live Digital Clock Bar */}
+              <div className="ios-clock-bar">
+                <div className="ios-clock-time-display">
+                  <div className="ios-digital-time">{timeString}</div>
+                  <span className="ios-clock-zone">WIB</span>
+                </div>
+                <div className="ios-clock-date-group">
+                  <div className="ios-date-badge">
+                    <Calendar size={13} />
+                    <span>{todayFormatted}</span>
                   </div>
-                  <div className="skpd-text-group">
-                    <span className="skpd-label">SKPD</span>
-                    <span className="skpd-name">{currentUser?.skpd || 'UPTD Puskesmas Cermee'}</span>
+                  <div className={`ios-status-badge ${workStatus.badgeClass}`}>
+                    <span className="ios-status-pulse-dot" style={{ backgroundColor: workStatus.dotColor }} />
+                    <span>{workStatus.label}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* 2. Presensi Hari Ini Card Matching Screenshot */}
-            <section className="presence-card">
-              <div className="presence-header">
-                <span className="presence-title">Presensi Hari Ini</span>
-                <div className="presence-date-group">
-                  <span>{todayFormatted}</span>
-                  <RefreshCw size={14} className="header-action-icon-small" onClick={() => window.location.reload()} />
-                  <Search size={14} className="header-action-icon-small" onClick={() => setActiveTab('history')} />
+            {/* 2. iOS DUAL PRESENCE WIDGET (MASUK & PULANG) */}
+            <div className="ios-presence-section">
+              <div className="ios-section-header">
+                <div className="ios-section-title-wrap">
+                  <Clock size={16} className="text-teal-600" />
+                  <h3 className="ios-section-title">Presensi Hari Ini</h3>
                 </div>
-              </div>
-
-              <div className="presence-body">
-                <div className="presence-columns">
-                  {/* Kolom Masuk */}
-                  <div className="presence-item">
-                    <div className="presence-icon-box masuk" style={{ backgroundColor: todayCheckIn?.type === 'Dinas Luar' ? '#FEF3C7' : undefined, color: todayCheckIn?.type === 'Dinas Luar' ? '#D97706' : undefined }}>
-                      <LogIn size={22} strokeWidth={2.5} />
-                    </div>
-                    <div className="presence-details">
-                      <span className="presence-type-label">{todayCheckIn?.type === 'Dinas Luar' ? 'Dinas Luar' : 'Masuk'}</span>
-                      <span className="presence-time" style={{ color: todayCheckIn ? '#0F172A' : '#94A3B8' }}>
-                        {todayCheckIn ? todayCheckIn.time : '-- : --'}
-                      </span>
-                      <span className="presence-tag" style={{ color: todayCheckIn?.type === 'Dinas Luar' ? '#D97706' : undefined }}>
-                        {todayCheckIn ? (todayCheckIn.type === 'Dinas Luar' ? 'DINAS LUAR (HADIR)' : (todayCheckIn.isLate ? todayCheckIn.status : (todayCheckIn.type || 'MASUK'))) : '-'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="presence-divider" />
-
-                  {/* Kolom Pulang */}
-                  <div className="presence-item">
-                    <div className="presence-icon-box pulang" style={{ backgroundColor: todayCheckIn?.type === 'Dinas Luar' ? '#ECFDF5' : undefined, color: todayCheckIn?.type === 'Dinas Luar' ? '#059669' : undefined }}>
-                      <LogOut size={22} strokeWidth={2.5} />
-                    </div>
-                    <div className="presence-details">
-                      <span className="presence-type-label">Pulang</span>
-                      <span className="presence-time" style={{ color: (todayCheckOut || todayCheckIn?.type === 'Dinas Luar') ? '#0F172A' : '#94A3B8' }}>
-                        {todayCheckIn?.type === 'Dinas Luar' ? 'Tuntas 1x' : (todayCheckOut ? todayCheckOut.time : '-- : --')}
-                      </span>
-                      <span className="presence-tag" style={{ color: todayCheckIn?.type === 'Dinas Luar' ? '#059669' : undefined }}>
-                        {todayCheckIn?.type === 'Dinas Luar' ? 'BEBAS PULANG' : (todayCheckOut ? todayCheckOut.status : '-')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tombol Selengkapnya -> Buka Riwayat Presensi */}
                 <button 
-                  className="btn-selengkapnya"
+                  type="button" 
+                  className="ios-history-link-btn"
                   onClick={() => setActiveTab('history')}
+                  title="Buka Riwayat Presensi"
                 >
-                  SELENGKAPNYA
+                  <span>Riwayat</span>
+                  <ChevronRight size={14} />
                 </button>
               </div>
-            </section>
 
-            {/* 3. Lokasi Anda Map Card Matching Screenshot */}
-            <section>
+              <div className="ios-presence-grid">
+                {/* WIDGET MASUK */}
+                <div 
+                  className={`ios-presence-card ${todayCheckIn ? 'has-checked' : 'pending'}`}
+                  onClick={() => {
+                    if (!todayCheckIn) {
+                      handleOpenMasukCamera('Masuk', 'HARIAN');
+                    }
+                  }}
+                >
+                  <div className="ios-presence-card-top">
+                    <div className="ios-card-icon-circle in">
+                      <LogIn size={20} />
+                    </div>
+                    <span className={`ios-card-tag ${todayCheckIn ? (todayCheckIn.isLate ? 'tag-late' : 'tag-ontime') : 'tag-empty'}`}>
+                      {todayCheckIn ? (todayCheckIn.type === 'Dinas Luar' ? 'DINAS LUAR' : (todayCheckIn.isLate ? todayCheckIn.status : 'TEPAT WAKTU')) : 'BELUM MASUK'}
+                    </span>
+                  </div>
+
+                  <div className="ios-presence-card-body">
+                    <span className="ios-card-label">Jam Masuk</span>
+                    <div className="ios-card-time-large">
+                      {todayCheckIn ? todayCheckIn.time : '-- : --'}
+                    </div>
+                    <span className="ios-card-subtext">
+                      {todayCheckIn 
+                        ? (todayCheckIn.type === 'Dinas Luar' ? 'Lokasi Tugas Luar' : 'UPTD PKM Cermee') 
+                        : 'Ketuk untuk presensi'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* WIDGET PULANG */}
+                <div 
+                  className={`ios-presence-card ${todayCheckOut || todayCheckIn?.type === 'Dinas Luar' ? 'has-checked' : 'pending'}`}
+                  onClick={() => {
+                    if (todayCheckIn && !todayCheckOut && todayCheckIn.type !== 'Dinas Luar') {
+                      handleOpenPulangCamera('Pulang', 'HARIAN');
+                    } else if (!todayCheckIn) {
+                      setShowPresensiMenu(true);
+                    }
+                  }}
+                >
+                  <div className="ios-presence-card-top">
+                    <div className="ios-card-icon-circle out">
+                      <LogOut size={20} />
+                    </div>
+                    <span className={`ios-card-tag ${todayCheckOut ? 'tag-checkout' : (todayCheckIn?.type === 'Dinas Luar' ? 'tag-ontime' : 'tag-empty')}`}>
+                      {todayCheckIn?.type === 'Dinas Luar' ? 'BEBAS PULANG' : (todayCheckOut ? todayCheckOut.status : 'BELUM PULANG')}
+                    </span>
+                  </div>
+
+                  <div className="ios-presence-card-body">
+                    <span className="ios-card-label">Jam Pulang</span>
+                    <div className="ios-card-time-large">
+                      {todayCheckIn?.type === 'Dinas Luar' ? 'Tuntas 1x' : (todayCheckOut ? todayCheckOut.time : '-- : --')}
+                    </div>
+                    <span className="ios-card-subtext">
+                      {todayCheckIn?.type === 'Dinas Luar' 
+                        ? 'Otomatis selesai' 
+                        : (todayCheckOut ? 'Presensi tuntas' : (todayCheckIn ? 'Ketuk untuk pulang' : 'Menunggu masuk'))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. iOS QUICK SHORTCUTS DOCK */}
+            <div className="ios-quick-shortcuts-widget">
+              <div className="ios-quick-shortcuts-header">
+                <Sparkles size={15} className="text-amber-500" />
+                <span>Pintasan Akses Cepat</span>
+              </div>
+              <div className="ios-quick-grid">
+                {/* 1. Harian */}
+                <button 
+                  type="button" 
+                  className="ios-quick-btn"
+                  onClick={() => setShowPresensiMenu(true)}
+                  title="Presensi Harian Pagi"
+                >
+                  <div className="ios-quick-icon-wrap bg-blue-50 text-blue-600">
+                    <Sun size={20} />
+                  </div>
+                  <span className="ios-quick-text">Harian</span>
+                </button>
+
+                {/* 2. Shift */}
+                <button 
+                  type="button" 
+                  className="ios-quick-btn"
+                  onClick={() => setShowPresensiMenu(true)}
+                  title="Presensi Jadwal Shift"
+                >
+                  <div className="ios-quick-icon-wrap bg-teal-50 text-teal-600">
+                    <Repeat size={20} />
+                  </div>
+                  <span className="ios-quick-text">Shift</span>
+                </button>
+
+                {/* 3. D3 */}
+                <button 
+                  type="button" 
+                  className="ios-quick-btn"
+                  onClick={() => setShowPresensiMenu(true)}
+                  title="Presensi Program D3"
+                >
+                  <div className="ios-quick-icon-wrap bg-emerald-50 text-emerald-600">
+                    <Briefcase size={20} />
+                  </div>
+                  <span className="ios-quick-text">D3</span>
+                </button>
+
+                {/* 4. Dinas Luar */}
+                <button 
+                  type="button" 
+                  className="ios-quick-btn"
+                  onClick={() => handleOpenMasukCamera('Dinas Luar', 'DINAS_LUAR')}
+                  title="Presensi Dinas Luar"
+                >
+                  <div className="ios-quick-icon-wrap bg-amber-50 text-amber-600">
+                    <Plane size={20} />
+                  </div>
+                  <span className="ios-quick-text">Dinas Luar</span>
+                </button>
+
+                {/* 5. Izin / Cuti */}
+                <button 
+                  type="button" 
+                  className="ios-quick-btn"
+                  onClick={() => handleOpenLeaveModal('Izin')}
+                  title="Formulir Izin / Sakit / Cuti"
+                >
+                  <div className="ios-quick-icon-wrap bg-purple-50 text-purple-600">
+                    <FileText size={20} />
+                  </div>
+                  <span className="ios-quick-text">Izin/Cuti</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4. iOS MINIMAP WIDGET (LOKASI ANDA) */}
+            <section className="ios-map-section">
               <LocationRadarMap />
             </section>
           </main>
@@ -228,7 +414,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
         </div>
       </div>
 
-      {/* Bottom Floating Navigation */}
+      {/* Bottom Floating Navigation Dock */}
       <BottomNav 
         activeTab={activeTab}
         onTabChange={handleBottomTabChange}
@@ -283,3 +469,4 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
     </div>
   );
 }
+

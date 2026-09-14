@@ -215,43 +215,53 @@ export function LocationRadarMap() {
   const isSpinning = isRefreshing || loading;
 
   return (
-    <div className="map-card">
-      {/* Header Lokasi Anda */}
-      <div className="map-header">
-        <div className="map-title">Lokasi Anda</div>
+    <div className="ios-map-widget-card">
+      {/* Header Lokasi Anda (iOS Widget Header) */}
+      <div className="ios-map-header">
+        <div className="ios-map-title-group">
+          <div className="ios-map-icon-box">
+            <Compass size={18} className="text-teal-600" />
+          </div>
+          <div>
+            <h4 className="ios-map-title">Lokasi & Radius Presensi</h4>
+            <span className="ios-map-subtitle">UPTD Puskesmas Cermee</span>
+          </div>
+        </div>
+
         <button 
           type="button"
-          className={`btn-refresh-peta ${isSpinning ? 'is-refreshing' : ''}`}
+          className={`ios-btn-refresh-peta ${isSpinning ? 'is-refreshing' : ''}`}
           onClick={handleRefreshBtn} 
           disabled={isSpinning}
           title="Perbarui Koordinat GPS"
         >
-          <span>Refresh Peta</span>
           <RefreshCw size={13} className={`refresh-icon ${isSpinning ? 'animate-spin' : ''}`} />
+          <span>Refresh</span>
         </button>
       </div>
 
       {/* Interactive Google Maps Body Container */}
-      <div className="map-card-body-wrapper">
+      <div className="ios-map-body-wrapper">
         {/* Real Interactive Leaflet + Google Maps Tile Map */}
         <div 
           ref={mapContainerRef} 
-          style={{ width: '100%', height: '100%', zIndex: 1 }} 
+          style={{ width: '100%', height: '100%', zIndex: 1, borderRadius: '18px' }} 
         />
 
         {/* 🟢 GPS Aktif Status Badge (Top-Left) */}
-        <div className="sipp-gps-active-pill">
+        <div className="ios-gps-status-pill">
           <span 
-            className="gps-green-dot" 
+            className="ios-gps-indicator-dot" 
             style={{ 
-              backgroundColor: !strictLocationLock ? '#3B82F6' : (isInRadius ? '#22C55E' : '#F59E0B') 
+              backgroundColor: !strictLocationLock ? '#3B82F6' : (isInRadius ? '#10B981' : '#F59E0B'),
+              boxShadow: !strictLocationLock ? '0 0 8px rgba(59,130,246,0.6)' : (isInRadius ? '0 0 8px rgba(16,185,129,0.6)' : '0 0 8px rgba(245,158,11,0.6)')
             }} 
           />
-          <span className="gps-pill-text">
+          <span className="ios-gps-pill-text">
             {gpsActive 
               ? (!strictLocationLock 
-                  ? `Bebas Lokasi (GPS: ${distance}m)` 
-                  : (isInRadius ? `GPS Aktif (${distance}m dari Kantor)` : `GPS Aktif (Di Luar Radius: ${distance}m)`))
+                  ? `Bebas Lokasi (${distance}m)` 
+                  : (isInRadius ? `Dalam Radius Kantor (${distance}m)` : `Luar Radius (${distance}m)`))
               : 'Mencari GPS...'}
           </span>
         </div>
@@ -265,7 +275,7 @@ export function LocationRadarMap() {
             onClick={handleCenterUser} 
             title="Pusatkan ke Lokasi Saya"
           >
-            <Compass size={24} color="#00838F" />
+            <Compass size={22} color="#00838F" />
           </button>
 
           {/* Zoom Buttons (+ / -) -> Real Interactive Zoom */}
@@ -276,7 +286,7 @@ export function LocationRadarMap() {
               title="Perbesar Peta (+)" 
               onClick={handleZoomIn}
             >
-              <Plus size={20} />
+              <Plus size={18} />
             </button>
             <div className="zoom-split-line" />
             <button 
@@ -285,7 +295,7 @@ export function LocationRadarMap() {
               title="Perkecil Peta (-)" 
               onClick={handleZoomOut}
             >
-              <Minus size={20} />
+              <Minus size={18} />
             </button>
           </div>
         </div>
@@ -293,3 +303,4 @@ export function LocationRadarMap() {
     </div>
   );
 }
+

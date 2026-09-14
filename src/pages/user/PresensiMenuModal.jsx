@@ -174,7 +174,7 @@ export function PresensiMenuModal({
                   onSelectMasuk('Masuk', 'HARIAN');
                 }}
               >
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#E0F7FA', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00838F' }}>
+                <div className="choice-card-icon-wrap" style={{ backgroundColor: '#E0F7FA', color: '#00838F' }}>
                   <Clock size={36} />
                 </div>
                 <span className="choice-label-masuk">MASUK</span>
@@ -188,7 +188,7 @@ export function PresensiMenuModal({
                   onSelectPulang('Pulang', 'HARIAN');
                 }}
               >
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#FFEBEE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#DC2626' }}>
+                <div className="choice-card-icon-wrap" style={{ backgroundColor: '#FFEBEE', color: '#DC2626' }}>
                   <Clock size={36} />
                 </div>
                 <span className="choice-label-pulang">PULANG</span>
@@ -197,21 +197,8 @@ export function PresensiMenuModal({
 
             <button 
               type="button"
+              className="modal-back-btn"
               onClick={() => setActiveStep('MAIN')}
-              style={{
-                background: '#F1F5F9',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '10px',
-                color: '#475569',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
             >
               <ArrowLeft size={16} /> Kembali ke Menu
             </button>
@@ -245,14 +232,13 @@ export function PresensiMenuModal({
             <div className="harian-choice-grid">
               {/* MASUK D3 */}
               <div 
-                className="choice-card-harian masuk"
+                className="choice-card-harian masuk-d3"
                 onClick={() => {
                   handleCloseAll();
                   onSelectMasuk('D3 Masuk', 'D3');
                 }}
-                style={{ borderColor: '#A7F3D0' }}
               >
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
+                <div className="choice-card-icon-wrap" style={{ backgroundColor: '#ECFDF5', color: '#059669' }}>
                   <Clock size={36} />
                 </div>
                 <span className="choice-label-masuk" style={{ color: '#059669' }}>MASUK D3</span>
@@ -266,7 +252,7 @@ export function PresensiMenuModal({
                   onSelectPulang('D3 Pulang', 'D3');
                 }}
               >
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#FFEBEE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#DC2626' }}>
+                <div className="choice-card-icon-wrap" style={{ backgroundColor: '#FFEBEE', color: '#DC2626' }}>
                   <Clock size={36} />
                 </div>
                 <span className="choice-label-pulang">PULANG D3</span>
@@ -275,21 +261,8 @@ export function PresensiMenuModal({
 
             <button 
               type="button"
+              className="modal-back-btn"
               onClick={() => setActiveStep('MAIN')}
-              style={{
-                background: '#F1F5F9',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '10px',
-                color: '#475569',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
             >
               <ArrowLeft size={16} /> Kembali ke Menu
             </button>
@@ -323,22 +296,11 @@ export function PresensiMenuModal({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', margin: '10px 0 16px 0' }}>
               {/* SHIFT 1: DINAS PAGI (07.00 - 14.00) */}
               <div 
+                className="choice-card-shift pagi"
                 onClick={() => handleSelectShift('PAGI')}
-                style={{
-                  background: '#FFFFFF',
-                  border: '2px solid #CCFBF1',
-                  borderRadius: '16px',
-                  padding: '14px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(13, 148, 136, 0.06)',
-                  transition: 'all 0.15s ease'
-                }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', backgroundColor: '#E0F7FA', color: '#00838F', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="shift-icon-wrap" style={{ backgroundColor: '#E0F7FA', color: '#00838F' }}>
                     <Sun size={24} />
                   </div>
                   <div>
@@ -353,22 +315,11 @@ export function PresensiMenuModal({
 
               {/* SHIFT 2: DINAS SORE (14.00 - 21.00) */}
               <div 
+                className="choice-card-shift sore"
                 onClick={() => handleSelectShift('SORE')}
-                style={{
-                  background: '#FFFFFF',
-                  border: '2px solid #FEF3C7',
-                  borderRadius: '16px',
-                  padding: '14px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(217, 119, 6, 0.06)',
-                  transition: 'all 0.15s ease'
-                }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', backgroundColor: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="shift-icon-wrap" style={{ backgroundColor: '#FEF3C7', color: '#D97706' }}>
                     <Sunset size={24} />
                   </div>
                   <div>
@@ -383,22 +334,11 @@ export function PresensiMenuModal({
 
               {/* SHIFT 3: DINAS MALAM (21.00 - 07.00) */}
               <div 
+                className="choice-card-shift malam"
                 onClick={() => handleSelectShift('MALAM')}
-                style={{
-                  background: '#FFFFFF',
-                  border: '2px solid #F3E8FF',
-                  borderRadius: '16px',
-                  padding: '14px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(124, 58, 237, 0.06)',
-                  transition: 'all 0.15s ease'
-                }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', backgroundColor: '#F3E8FF', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="shift-icon-wrap" style={{ backgroundColor: '#F3E8FF', color: '#7C3AED' }}>
                     <Moon size={24} />
                   </div>
                   <div>
@@ -414,21 +354,8 @@ export function PresensiMenuModal({
 
             <button 
               type="button"
+              className="modal-back-btn"
               onClick={() => setActiveStep('MAIN')}
-              style={{
-                background: '#F1F5F9',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '10px',
-                color: '#475569',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
             >
               <ArrowLeft size={16} /> Kembali ke Menu
             </button>
@@ -473,7 +400,7 @@ export function PresensiMenuModal({
                   onSelectMasuk('Shift Masuk', 'SHIFT', selectedShift);
                 }}
               >
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: currentShiftConfig.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: currentShiftConfig.color }}>
+                <div className="choice-card-icon-wrap" style={{ backgroundColor: currentShiftConfig.bg, color: currentShiftConfig.color }}>
                   <Clock size={36} />
                 </div>
                 <span className="choice-label-masuk" style={{ color: currentShiftConfig.color }}>MASUK SHIFT</span>
@@ -487,7 +414,7 @@ export function PresensiMenuModal({
                   onSelectPulang('Shift Pulang', 'SHIFT', selectedShift);
                 }}
               >
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#FFEBEE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#DC2626' }}>
+                <div className="choice-card-icon-wrap" style={{ backgroundColor: '#FFEBEE', color: '#DC2626' }}>
                   <Clock size={36} />
                 </div>
                 <span className="choice-label-pulang">PULANG SHIFT</span>
@@ -496,21 +423,8 @@ export function PresensiMenuModal({
 
             <button 
               type="button"
+              className="modal-back-btn"
               onClick={() => setActiveStep('SHIFT_CHOICE')}
-              style={{
-                background: '#F1F5F9',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '10px',
-                color: '#475569',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
             >
               <ArrowLeft size={16} /> Ganti Shift
             </button>

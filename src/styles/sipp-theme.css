@@ -1231,30 +1231,45 @@
 .menu-item-card {
   background: #F8FAFC;
   border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  border: 1.5px solid #F1F5F9;
   border-radius: 18px;
-  padding: 16px 8px;
+  padding: 16px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.03);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .menu-item-card:hover {
   background: #F0FDFA;
   border-color: #99F6E4;
-  transform: translateY(-2px);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(0, 131, 143, 0.12);
+}
+
+.menu-item-card:active {
+  transform: scale(0.92);
+}
+
+.menu-item-card:hover .menu-icon-wrapper {
+  transform: scale(1.1) rotate(-4deg);
 }
 
 .menu-icon-wrapper {
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .menu-label {
@@ -1274,24 +1289,97 @@
 .choice-card-harian {
   background: #FFFFFF;
   border: 2px solid #E2E8F0;
-  border-radius: 20px;
+  border-radius: 22px;
   padding: 24px 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   cursor: pointer;
-  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
+.choice-card-harian:hover {
+  transform: translateY(-5px) scale(1.02);
+}
+
+.choice-card-harian:active {
+  transform: scale(0.93);
+}
+
+/* MASUK (Teal / Blue Glow on Hover) */
 .choice-card-harian.masuk {
   border-color: #B2EBF2;
-  background: #F4FDFF;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F0FDFA 100%);
 }
 
+.choice-card-harian.masuk:hover {
+  border-color: #00838F;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E0F7FA 100%);
+  box-shadow: 0 14px 28px rgba(0, 131, 143, 0.22);
+}
+
+.choice-card-harian.masuk:active {
+  background: #CCFBF1;
+  box-shadow: 0 2px 8px rgba(0, 131, 143, 0.15);
+}
+
+/* D3 MASUK (Emerald Glow on Hover) */
+.choice-card-harian.masuk-d3 {
+  border-color: #A7F3D0;
+  background: linear-gradient(180deg, #FFFFFF 0%, #ECFDF5 100%);
+}
+
+.choice-card-harian.masuk-d3:hover {
+  border-color: #059669;
+  background: linear-gradient(180deg, #FFFFFF 0%, #D1FAE5 100%);
+  box-shadow: 0 14px 28px rgba(5, 150, 105, 0.22);
+}
+
+.choice-card-harian.masuk-d3:active {
+  background: #A7F3D0;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.15);
+}
+
+/* PULANG (Rose / Red Glow on Hover) */
 .choice-card-harian.pulang {
   border-color: #FFCDD2;
-  background: #FFF8F8;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFF5F5 100%);
+}
+
+.choice-card-harian.pulang:hover {
+  border-color: #DC2626;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FEE2E2 100%);
+  box-shadow: 0 14px 28px rgba(220, 38, 38, 0.22);
+}
+
+.choice-card-harian.pulang:active {
+  background: #FECDD3;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+}
+
+/* Icon circles inside cards with smooth hover reaction */
+.choice-card-icon-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.choice-card-harian:hover .choice-card-icon-wrap {
+  transform: scale(1.12) rotate(-5deg);
+}
+
+.choice-card-harian:active .choice-card-icon-wrap {
+  transform: scale(0.9);
 }
 
 .choice-label-masuk {
@@ -1304,6 +1392,109 @@
   font-size: 1.1rem;
   font-weight: 800;
   color: #DC2626;
+}
+
+/* Shift Selection List Cards */
+.choice-card-shift {
+  background: #FFFFFF;
+  border-radius: 18px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  border: 2px solid transparent;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.choice-card-shift:hover {
+  transform: translateY(-3px) scale(1.015);
+}
+
+.choice-card-shift:active {
+  transform: scale(0.95);
+}
+
+.choice-card-shift.pagi {
+  border-color: #CCFBF1;
+  background: linear-gradient(90deg, #FFFFFF 0%, #F0FDFA 100%);
+}
+
+.choice-card-shift.pagi:hover {
+  border-color: #00838F;
+  background: linear-gradient(90deg, #FFFFFF 0%, #E0F7FA 100%);
+  box-shadow: 0 8px 24px rgba(13, 148, 136, 0.2);
+}
+
+.choice-card-shift.sore {
+  border-color: #FEF3C7;
+  background: linear-gradient(90deg, #FFFFFF 0%, #FFFBEB 100%);
+}
+
+.choice-card-shift.sore:hover {
+  border-color: #D97706;
+  background: linear-gradient(90deg, #FFFFFF 0%, #FEF3C7 100%);
+  box-shadow: 0 8px 24px rgba(217, 119, 6, 0.2);
+}
+
+.choice-card-shift.malam {
+  border-color: #F3E8FF;
+  background: linear-gradient(90deg, #FFFFFF 0%, #FAF5FF 100%);
+}
+
+.choice-card-shift.malam:hover {
+  border-color: #7C3AED;
+  background: linear-gradient(90deg, #FFFFFF 0%, #F3E8FF 100%);
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.2);
+}
+
+.choice-card-shift:hover .shift-icon-wrap {
+  transform: scale(1.12) rotate(-5deg);
+}
+
+.choice-card-shift:active .shift-icon-wrap {
+  transform: scale(0.9);
+}
+
+.shift-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-back-btn {
+  background: #F1F5F9;
+  border: none;
+  border-radius: 14px;
+  padding: 12px;
+  color: #475569;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.modal-back-btn:hover {
+  background: #E2E8F0;
+  color: #1E293B;
+  transform: translateY(-1px);
+}
+
+.modal-back-btn:active {
+  transform: scale(0.96);
 }
 
 .camera-view-container {

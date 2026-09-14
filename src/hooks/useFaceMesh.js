@@ -240,12 +240,27 @@ export function useFaceMesh({
     canvas.height = video.videoHeight || 640;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Oval Guide Parameters in Canvas Pixel Space
+    const ovalCenterX = canvas.width * 0.5;
+    const ovalCenterY = canvas.height * 0.48;
+    const ovalRadiusX = canvas.width * 0.28;
+    const ovalRadiusY = canvas.height * 0.36;
+
+    const isPointInsideOval = (pt, factorX = 1.0, factorY = 1.0) => {
+      if (!pt) return false;
+      const px = pt.x * canvas.width;
+      const py = pt.y * canvas.height;
+      const dx = (px - ovalCenterX) / (ovalRadiusX * factorX);
+      const dy = (py - ovalCenterY) / (ovalRadiusY * factorY);
+      return (dx * dx + dy * dy) <= 1.0;
+    };
+
     if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
       setFaceDetected(false);
       setFaceInGuide(false);
       setProgress(0);
       setPromptText('Posisikan Wajah');
-      setPromptSubtitle('Arahkan wajah ke dalam lingkaran');
+      setPromptSubtitle('Arahkan wajah ke dalam batas oval');
       blinkStateRef.current.hasClosed = false;
       blinkStateRef.current.calibratedFrames = 0;
       return;
@@ -254,39 +269,47 @@ export function useFaceMesh({
     const landmarks = results.multiFaceLandmarks[0];
     setFaceDetected(true);
 
-    // 1. Head Pose & Alignment Check
+    // 1. Core Feature Landmarks
     const noseTip = landmarks[1];
     const leftCheek = landmarks[234];
     const rightCheek = landmarks[454];
     const leftEye = landmarks[133];
     const rightEye = landmarks[362];
+    const chin = landmarks[152];
+    const forehead = landmarks[10];
 
     if (!noseTip || !leftCheek || !rightCheek || !leftEye || !rightEye) {
       return;
     }
 
-    const leftDist = Math.abs(noseTip.x - leftCheek.x);
-    const rightDist = Math.abs(rightCheek.x - noseTip.x);
-    const symmetryRatio = leftDist / (rightDist + 0.0001);
-    const eyeTilt = Math.abs(leftEye.y - rightEye.y);
+    // Check if face is strictly positioned inside the oval boundary
+    const isNoseInOval = isPointInsideOval(noseTip, 0.85, 0.85);
+    const isLeftEyeInOval = isPointInsideOval(leftEye, 0.98, 0.98);
+    const isRightEyeInOval = isPointInsideOval(rightEye, 0.98, 0.98);
+    const isChinInOval = isPointInsideOval(chin, 1.05, 1.05);
+    const isForeheadInOval = isPointInsideOval(forehead, 1.05, 1.05);
 
-    const isFacingSideways = symmetryRatio < 0.45 || symmetryRatio > 2.20;
-    const isHeadTilted = eyeTilt > 0.16;
-    const isCentered = noseTip.x > 0.12 && noseTip.x < 0.88 && noseTip.y > 0.10 && noseTip.y < 0.90;
+    const isInsideOval = isNoseInOval && isLeftEyeInOval && isRightEyeInOval && isChinInOval && isForeheadInOval;
+    setFaceInGuide(isInsideOval);
 
-    const isFacePositionValid = isCentered && !isFacingSideways && !isHeadTilted;
-    setFaceInGuide(isFacePositionValid);
-
-    // Draw facial contour green dots (exact SIPP look)
+    // Draw facial contour dots ONLY inside the oval guide area
     ctx.save();
-    ctx.fillStyle = matchError ? '#EF4444' : '#4ADE80';
-    ctx.shadowColor = matchError ? '#DC2626' : '#22C55E';
+    ctx.beginPath();
+    ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX, ovalRadiusY, 0, 0, 2 * Math.PI);
+    ctx.clip(); // Guaranteed: NO dots can be rendered outside the oval guide!
+
+    ctx.fillStyle = matchError 
+      ? '#EF4444' 
+      : isInsideOval 
+        ? '#4ADE80' 
+        : '#F59E0B';
+    ctx.shadowColor = matchError ? '#DC2626' : (isInsideOval ? '#22C55E' : '#D97706');
     ctx.shadowBlur = 3;
 
     for (let i = 0; i < CONTOUR_LANDMARKS.length; i++) {
       const idx = CONTOUR_LANDMARKS[i];
       const pt = landmarks[idx];
-      if (pt) {
+      if (pt && isPointInsideOval(pt, 1.0, 1.0)) {
         const x = pt.x * canvas.width;
         const y = pt.y * canvas.height;
         ctx.beginPath();
@@ -295,6 +318,25 @@ export function useFaceMesh({
       }
     }
     ctx.restore();
+
+    // 2. Enforce Face Positioning Inside Oval Before Any Recognition
+    if (!isInsideOval) {
+      setPromptText('Posisikan Wajah di Dalam Oval');
+      setPromptSubtitle('Arahkan wajah Anda tepat ke dalam garis oval');
+      setProgress(0);
+      blinkStateRef.current.hasClosed = false;
+      blinkStateRef.current.calibratedFrames = 0;
+      return;
+    }
+
+    // 3. Head Pose & Alignment Check
+    const leftDist = Math.abs(noseTip.x - leftCheek.x);
+    const rightDist = Math.abs(rightCheek.x - noseTip.x);
+    const symmetryRatio = leftDist / (rightDist + 0.0001);
+    const eyeTilt = Math.abs(leftEye.y - rightEye.y);
+
+    const isFacingSideways = symmetryRatio < 0.45 || symmetryRatio > 2.20;
+    const isHeadTilted = eyeTilt > 0.16;
 
     if (isFacingSideways) {
       setPromptText('Hadapkan Wajah Lurus');
@@ -312,26 +354,16 @@ export function useFaceMesh({
       return;
     }
 
-    if (!isCentered) {
-      setPromptText('Posisikan Wajah di Tengah');
-      setPromptSubtitle('Arahkan wajah ke dalam lingkaran panduan');
-      setProgress(15);
-      blinkStateRef.current.hasClosed = false;
-      return;
-    }
-
-    // Collect frame sample if position is good
-    if (isFacePositionValid) {
-      const currentDesc = extractFaceDescriptor(landmarks);
-      if (currentDesc) {
-        descriptorSamplesRef.current.push(currentDesc);
-        if (descriptorSamplesRef.current.length > 10) {
-          descriptorSamplesRef.current.shift();
-        }
+    // Collect frame sample if position is completely valid
+    const currentDesc = extractFaceDescriptor(landmarks);
+    if (currentDesc) {
+      descriptorSamplesRef.current.push(currentDesc);
+      if (descriptorSamplesRef.current.length > 10) {
+        descriptorSamplesRef.current.shift();
       }
     }
 
-    // 2. Adaptive Relative Drop Eye-Blink Detection (100% Reliable for all eye shapes)
+    // 4. Adaptive Relative Drop Eye-Blink Detection (100% Reliable for all eye shapes)
     const eyeOpenness = getEyeOpenness(landmarks);
     if (!eyeOpenness) return;
 

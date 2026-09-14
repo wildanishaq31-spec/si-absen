@@ -348,15 +348,18 @@ export function FaceCameraModal({
               style={{
                 position: 'absolute',
                 top: masterDescriptor ? '62px' : '24px',
+                left: '50%',
+                transform: 'translateX(-50%)',
                 zIndex: 20,
-                backgroundColor: matchError ? 'rgba(239, 68, 68, 0.92)' : isVerified ? 'rgba(5, 150, 105, 0.92)' : 'rgba(15, 23, 42, 0.85)',
+                backgroundColor: matchError ? 'rgba(239, 68, 68, 0.92)' : isVerified ? 'rgba(5, 150, 105, 0.92)' : (faceDetected && faceInGuide) ? 'rgba(5, 150, 105, 0.85)' : 'rgba(15, 23, 42, 0.85)',
                 backdropFilter: 'blur(8px)',
-                border: `1.5px solid ${matchError ? '#EF4444' : isVerified ? '#10B981' : 'rgba(255, 255, 255, 0.15)'}`,
+                border: `1.5px solid ${matchError ? '#EF4444' : isVerified ? '#10B981' : (faceDetected && faceInGuide) ? '#10B981' : (faceDetected && !faceInGuide) ? '#F59E0B' : 'rgba(255, 255, 255, 0.15)'}`,
                 borderRadius: '16px',
                 padding: '10px 22px',
                 textAlign: 'center',
                 boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)',
                 transition: 'all 0.3s ease',
+                width: 'max-content',
                 maxWidth: '90%'
               }}
             >
@@ -404,26 +407,30 @@ export function FaceCameraModal({
             <div 
               style={{
                 position: 'absolute',
-                top: '46%',
+                top: '48%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
-                width: '240px',
-                height: '320px',
+                width: 'min(260px, 68vw)',
+                height: 'min(340px, 88vw)',
                 borderRadius: '50%',
                 border: matchError 
                   ? '3px solid #EF4444' 
                   : isVerified 
                     ? '3px solid #22C55E' 
-                    : faceDetected 
+                    : (faceDetected && faceInGuide) 
                       ? '3px solid #34D399' 
-                      : '3px dashed #64748B',
+                      : (faceDetected && !faceInGuide)
+                        ? '3px dashed #F59E0B'
+                        : '3px dashed #64748B',
                 boxShadow: matchError 
                   ? '0 0 30px #EF4444, inset 0 0 20px rgba(239, 68, 68, 0.3)'
                   : isVerified
                     ? '0 0 30px #22C55E, inset 0 0 20px rgba(34, 197, 94, 0.3)'
-                    : faceDetected
-                      ? '0 0 25px rgba(52, 211, 153, 0.5)'
-                      : 'none',
+                    : (faceDetected && faceInGuide)
+                      ? '0 0 25px rgba(52, 211, 153, 0.5), inset 0 0 15px rgba(52, 211, 153, 0.15)'
+                      : (faceDetected && !faceInGuide)
+                        ? '0 0 20px rgba(245, 158, 11, 0.3)'
+                        : 'none',
                 pointerEvents: 'none',
                 zIndex: 15,
                 transition: 'all 0.3s ease',
@@ -442,8 +449,10 @@ export function FaceCameraModal({
                   height: '3px',
                   background: matchError 
                     ? 'linear-gradient(90deg, transparent, #EF4444, #F87171, #EF4444, transparent)'
-                    : 'linear-gradient(90deg, transparent, #22C55E, #00ACC1, #22C55E, transparent)',
-                  boxShadow: matchError ? '0 0 15px #EF4444' : '0 0 15px #22C55E',
+                    : (faceDetected && faceInGuide)
+                      ? 'linear-gradient(90deg, transparent, #22C55E, #00ACC1, #22C55E, transparent)'
+                      : 'linear-gradient(90deg, transparent, #F59E0B, #FBBF24, #F59E0B, transparent)',
+                  boxShadow: matchError ? '0 0 15px #EF4444' : (faceDetected && faceInGuide) ? '0 0 15px #22C55E' : '0 0 10px #F59E0B',
                   animation: 'faceLaserScan 2s infinite ease-in-out'
                 }} 
               />

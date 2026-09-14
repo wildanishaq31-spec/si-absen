@@ -518,14 +518,18 @@ export function RegisterPage({ onNavigateToLogin, onRegisterSuccess }) {
                   style={{
                     position: 'absolute',
                     top: '16px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
                     zIndex: 20,
-                    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                    backgroundColor: (faceDetected && faceInGuide) ? 'rgba(5, 150, 105, 0.85)' : 'rgba(15, 23, 42, 0.85)',
                     backdropFilter: 'blur(8px)',
-                    border: '1.5px solid rgba(255, 255, 255, 0.15)',
+                    border: `1.5px solid ${(faceDetected && faceInGuide) ? '#10B981' : (faceDetected && !faceInGuide) ? '#F59E0B' : 'rgba(255, 255, 255, 0.15)'}`,
                     borderRadius: '14px',
                     padding: '8px 18px',
                     textAlign: 'center',
-                    boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)'
+                    boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)',
+                    width: 'max-content',
+                    maxWidth: '90%'
                   }}
                 >
                   <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -552,14 +556,22 @@ export function RegisterPage({ onNavigateToLogin, onRegisterSuccess }) {
                 <div
                   style={{
                     position: 'absolute',
-                    top: '50%',
+                    top: '48%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    width: '200px',
-                    height: '260px',
+                    width: 'min(240px, 68vw)',
+                    height: 'min(320px, 88vw)',
                     borderRadius: '50%',
-                    border: faceDetected ? '3px solid #34D399' : '3px dashed #64748B',
-                    boxShadow: faceDetected ? '0 0 25px rgba(52, 211, 153, 0.5)' : 'none',
+                    border: (faceDetected && faceInGuide)
+                      ? '3px solid #34D399'
+                      : (faceDetected && !faceInGuide)
+                        ? '3px dashed #F59E0B'
+                        : '3px dashed #64748B',
+                    boxShadow: (faceDetected && faceInGuide)
+                      ? '0 0 25px rgba(52, 211, 153, 0.5), inset 0 0 15px rgba(52, 211, 153, 0.15)'
+                      : (faceDetected && !faceInGuide)
+                        ? '0 0 20px rgba(245, 158, 11, 0.3)'
+                        : 'none',
                     pointerEvents: 'none',
                     zIndex: 15,
                     overflow: 'hidden'
@@ -571,8 +583,10 @@ export function RegisterPage({ onNavigateToLogin, onRegisterSuccess }) {
                       left: 0,
                       right: 0,
                       height: '2px',
-                      background: 'linear-gradient(90deg, transparent, #22C55E, #00ACC1, #22C55E, transparent)',
-                      boxShadow: '0 0 12px #22C55E',
+                      background: (faceDetected && faceInGuide)
+                        ? 'linear-gradient(90deg, transparent, #22C55E, #00ACC1, #22C55E, transparent)'
+                        : 'linear-gradient(90deg, transparent, #F59E0B, #FBBF24, #F59E0B, transparent)',
+                      boxShadow: (faceDetected && faceInGuide) ? '0 0 12px #22C55E' : '0 0 10px #F59E0B',
                       animation: 'faceLaserScan 2s infinite ease-in-out'
                     }}
                   />

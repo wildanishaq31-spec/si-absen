@@ -173,6 +173,9 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
         onLogout={onLogout}
         onOpenMonitoring={() => setShowMonitoringModal(true)}
         onOpenUpdatePhoto={() => setShowUpdatePhotoModal(true)}
+        onOpenHistory={() => setActiveTab('history')}
+        onOpenLeaveRequest={() => handleOpenLeaveModal('Izin')}
+        onSwitchToAdmin={onSwitchToAdmin}
       />
 
       {/* Horizontal Sliding Page Transition (Beranda <-> Riwayat Presensi) */}

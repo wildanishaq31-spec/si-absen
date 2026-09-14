@@ -551,46 +551,6 @@ export function RegisterPage({ onNavigateToLogin, onRegisterSuccess }) {
                     </div>
                   )}
                 </div>
-
-                {/* Glowing Oval Guide */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '48%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: 'min(240px, 68vw)',
-                    height: 'min(320px, 88vw)',
-                    borderRadius: '50%',
-                    border: (faceDetected && faceInGuide)
-                      ? '3px solid #34D399'
-                      : (faceDetected && !faceInGuide)
-                        ? '3px dashed #F59E0B'
-                        : '3px dashed #64748B',
-                    boxShadow: (faceDetected && faceInGuide)
-                      ? '0 0 25px rgba(52, 211, 153, 0.5), inset 0 0 15px rgba(52, 211, 153, 0.15)'
-                      : (faceDetected && !faceInGuide)
-                        ? '0 0 20px rgba(245, 158, 11, 0.3)'
-                        : 'none',
-                    pointerEvents: 'none',
-                    zIndex: 15,
-                    overflow: 'hidden'
-                  }}
-                >
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      height: '2px',
-                      background: (faceDetected && faceInGuide)
-                        ? 'linear-gradient(90deg, transparent, #22C55E, #00ACC1, #22C55E, transparent)'
-                        : 'linear-gradient(90deg, transparent, #F59E0B, #FBBF24, #F59E0B, transparent)',
-                      boxShadow: (faceDetected && faceInGuide) ? '0 0 12px #22C55E' : '0 0 10px #F59E0B',
-                      animation: 'faceLaserScan 2s infinite ease-in-out'
-                    }}
-                  />
-                </div>
               </>
             )}
           </div>

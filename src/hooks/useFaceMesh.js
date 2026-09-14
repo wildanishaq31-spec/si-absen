@@ -240,11 +240,12 @@ export function useFaceMesh({
     canvas.height = video.videoHeight || 640;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Oval Guide Parameters in Canvas Pixel Space
+    // Oval Guide Parameters calibrated to video aspect ratio
+    const minDim = Math.min(canvas.width, canvas.height);
     const ovalCenterX = canvas.width * 0.5;
     const ovalCenterY = canvas.height * 0.48;
-    const ovalRadiusX = canvas.width * 0.28;
-    const ovalRadiusY = canvas.height * 0.36;
+    const ovalRadiusX = minDim * 0.28;
+    const ovalRadiusY = minDim * 0.40;
 
     const isPointInsideOval = (pt, factorX = 1.0, factorY = 1.0) => {
       if (!pt) return false;
@@ -255,9 +256,161 @@ export function useFaceMesh({
       return (dx * dx + dy * dy) <= 1.0;
     };
 
-    if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
-      setFaceDetected(false);
-      setFaceInGuide(false);
+    const hasLandmarks = results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0;
+    const landmarks = hasLandmarks ? results.multiFaceLandmarks[0] : null;
+
+    let isInsideOval = false;
+    let isFacingSideways = false;
+    let isHeadTilted = false;
+
+    if (landmarks) {
+      const noseTip = landmarks[1];
+      const leftCheek = landmarks[234];
+      const rightCheek = landmarks[454];
+      const leftEye = landmarks[133];
+      const rightEye = landmarks[362];
+      const chin = landmarks[152];
+      const forehead = landmarks[10];
+
+      if (noseTip && leftCheek && rightCheek && leftEye && rightEye) {
+        const isNoseInOval = isPointInsideOval(noseTip, 0.75, 0.75);
+        const isLeftEyeInOval = isPointInsideOval(leftEye, 0.95, 0.95);
+        const isRightEyeInOval = isPointInsideOval(rightEye, 0.95, 0.95);
+        const isChinInOval = isPointInsideOval(chin, 1.0, 1.0);
+        const isForeheadInOval = isPointInsideOval(forehead, 1.0, 1.0);
+
+        isInsideOval = isNoseInOval && isLeftEyeInOval && isRightEyeInOval && isChinInOval && isForeheadInOval;
+
+        const leftDist = Math.abs(noseTip.x - leftCheek.x);
+        const rightDist = Math.abs(rightCheek.x - noseTip.x);
+        const symmetryRatio = leftDist / (rightDist + 0.0001);
+        const eyeTilt = Math.abs(leftEye.y - rightEye.y);
+
+        isFacingSideways = symmetryRatio < 0.45 || symmetryRatio > 2.20;
+        isHeadTilted = eyeTilt > 0.16;
+      }
+    }
+
+    setFaceDetected(hasLandmarks);
+    setFaceInGuide(isInsideOval);
+
+    // ==========================================
+    // 1. DRAW DARK VIGNETTE MASK OUTSIDE OVAL
+    // ==========================================
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.rect(0, 0, canvas.width, canvas.height);
+    ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX, ovalRadiusY, 0, 0, 2 * Math.PI);
+    ctx.fill('evenodd');
+    ctx.restore();
+
+    // ==========================================
+    // 2. DRAW GLOWING OVAL BOUNDARY GUIDE
+    // ==========================================
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX, ovalRadiusY, 0, 0, 2 * Math.PI);
+    ctx.lineWidth = 3.5;
+    if (matchError) {
+      ctx.strokeStyle = '#EF4444';
+      ctx.shadowColor = '#EF4444';
+      ctx.shadowBlur = 18;
+      ctx.setLineDash([]);
+    } else if (isVerified) {
+      ctx.strokeStyle = '#22C55E';
+      ctx.shadowColor = '#22C55E';
+      ctx.shadowBlur = 22;
+      ctx.setLineDash([]);
+    } else if (hasLandmarks && isInsideOval) {
+      ctx.strokeStyle = '#34D399';
+      ctx.shadowColor = '#10B981';
+      ctx.shadowBlur = 18;
+      ctx.setLineDash([]);
+    } else if (hasLandmarks && !isInsideOval) {
+      ctx.strokeStyle = '#F59E0B';
+      ctx.shadowColor = '#F59E0B';
+      ctx.shadowBlur = 12;
+      ctx.setLineDash([8, 6]);
+    } else {
+      ctx.strokeStyle = '#64748B';
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.setLineDash([8, 6]);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // ==========================================
+    // 3. DRAW ANIMATED LASER SCAN BAR (CLIPPED)
+    // ==========================================
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX, ovalRadiusY, 0, 0, 2 * Math.PI);
+    ctx.clip();
+
+    const time = Date.now() / 1000;
+    const laserY = ovalCenterY + Math.sin(time * 2.8) * (ovalRadiusY * 0.88);
+
+    const laserGradient = ctx.createLinearGradient(ovalCenterX - ovalRadiusX, laserY, ovalCenterX + ovalRadiusX, laserY);
+    if (matchError) {
+      laserGradient.addColorStop(0, 'rgba(239, 68, 68, 0)');
+      laserGradient.addColorStop(0.5, 'rgba(239, 68, 68, 0.95)');
+      laserGradient.addColorStop(1, 'rgba(239, 68, 68, 0)');
+      ctx.strokeStyle = laserGradient;
+      ctx.shadowColor = '#EF4444';
+    } else if (hasLandmarks && isInsideOval) {
+      laserGradient.addColorStop(0, 'rgba(34, 197, 94, 0)');
+      laserGradient.addColorStop(0.5, 'rgba(52, 211, 153, 0.95)');
+      laserGradient.addColorStop(1, 'rgba(34, 197, 94, 0)');
+      ctx.strokeStyle = laserGradient;
+      ctx.shadowColor = '#22C55E';
+    } else {
+      laserGradient.addColorStop(0, 'rgba(245, 158, 11, 0)');
+      laserGradient.addColorStop(0.5, 'rgba(251, 191, 36, 0.85)');
+      laserGradient.addColorStop(1, 'rgba(245, 158, 11, 0)');
+      ctx.strokeStyle = laserGradient;
+      ctx.shadowColor = '#F59E0B';
+    }
+    ctx.shadowBlur = 12;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(ovalCenterX - ovalRadiusX, laserY);
+    ctx.lineTo(ovalCenterX + ovalRadiusX, laserY);
+    ctx.stroke();
+    ctx.restore();
+
+    // ==========================================
+    // 4. DRAW FACIAL LANDMARK DOTS (ONLY INSIDE OVAL)
+    // ==========================================
+    if (landmarks && isInsideOval) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX, ovalRadiusY, 0, 0, 2 * Math.PI);
+      ctx.clip(); // 100% Clip Protection
+
+      ctx.fillStyle = matchError ? '#EF4444' : isVerified ? '#22C55E' : '#4ADE80';
+      ctx.shadowColor = matchError ? '#DC2626' : '#22C55E';
+      ctx.shadowBlur = 4;
+
+      for (let i = 0; i < CONTOUR_LANDMARKS.length; i++) {
+        const idx = CONTOUR_LANDMARKS[i];
+        const pt = landmarks[idx];
+        if (pt && isPointInsideOval(pt, 1.0, 1.0)) {
+          const x = pt.x * canvas.width;
+          const y = pt.y * canvas.height;
+          ctx.beginPath();
+          ctx.arc(x, y, 1.8, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
+    // ==========================================
+    // 5. ENFORCE STRICT VALIDATIONS BEFORE LIVENESS
+    // ==========================================
+    if (!hasLandmarks) {
       setProgress(0);
       setPromptText('Posisikan Wajah');
       setPromptSubtitle('Arahkan wajah ke dalam batas oval');
@@ -266,90 +419,27 @@ export function useFaceMesh({
       return;
     }
 
-    const landmarks = results.multiFaceLandmarks[0];
-    setFaceDetected(true);
-
-    // 1. Core Feature Landmarks
-    const noseTip = landmarks[1];
-    const leftCheek = landmarks[234];
-    const rightCheek = landmarks[454];
-    const leftEye = landmarks[133];
-    const rightEye = landmarks[362];
-    const chin = landmarks[152];
-    const forehead = landmarks[10];
-
-    if (!noseTip || !leftCheek || !rightCheek || !leftEye || !rightEye) {
-      return;
-    }
-
-    // Check if face is strictly positioned inside the oval boundary
-    const isNoseInOval = isPointInsideOval(noseTip, 0.85, 0.85);
-    const isLeftEyeInOval = isPointInsideOval(leftEye, 0.98, 0.98);
-    const isRightEyeInOval = isPointInsideOval(rightEye, 0.98, 0.98);
-    const isChinInOval = isPointInsideOval(chin, 1.05, 1.05);
-    const isForeheadInOval = isPointInsideOval(forehead, 1.05, 1.05);
-
-    const isInsideOval = isNoseInOval && isLeftEyeInOval && isRightEyeInOval && isChinInOval && isForeheadInOval;
-    setFaceInGuide(isInsideOval);
-
-    // Draw facial contour dots ONLY inside the oval guide area
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(ovalCenterX, ovalCenterY, ovalRadiusX, ovalRadiusY, 0, 0, 2 * Math.PI);
-    ctx.clip(); // Guaranteed: NO dots can be rendered outside the oval guide!
-
-    ctx.fillStyle = matchError 
-      ? '#EF4444' 
-      : isInsideOval 
-        ? '#4ADE80' 
-        : '#F59E0B';
-    ctx.shadowColor = matchError ? '#DC2626' : (isInsideOval ? '#22C55E' : '#D97706');
-    ctx.shadowBlur = 3;
-
-    for (let i = 0; i < CONTOUR_LANDMARKS.length; i++) {
-      const idx = CONTOUR_LANDMARKS[i];
-      const pt = landmarks[idx];
-      if (pt && isPointInsideOval(pt, 1.0, 1.0)) {
-        const x = pt.x * canvas.width;
-        const y = pt.y * canvas.height;
-        ctx.beginPath();
-        ctx.arc(x, y, 1.7, 0, 2 * Math.PI);
-        ctx.fill();
-      }
-    }
-    ctx.restore();
-
-    // 2. Enforce Face Positioning Inside Oval Before Any Recognition
     if (!isInsideOval) {
+      setProgress(0);
       setPromptText('Posisikan Wajah di Dalam Oval');
       setPromptSubtitle('Arahkan wajah Anda tepat ke dalam garis oval');
-      setProgress(0);
       blinkStateRef.current.hasClosed = false;
       blinkStateRef.current.calibratedFrames = 0;
       return;
     }
 
-    // 3. Head Pose & Alignment Check
-    const leftDist = Math.abs(noseTip.x - leftCheek.x);
-    const rightDist = Math.abs(rightCheek.x - noseTip.x);
-    const symmetryRatio = leftDist / (rightDist + 0.0001);
-    const eyeTilt = Math.abs(leftEye.y - rightEye.y);
-
-    const isFacingSideways = symmetryRatio < 0.45 || symmetryRatio > 2.20;
-    const isHeadTilted = eyeTilt > 0.16;
-
     if (isFacingSideways) {
+      setProgress(0);
       setPromptText('Hadapkan Wajah Lurus');
       setPromptSubtitle('Jangan menghadap ke samping');
-      setProgress(0);
       blinkStateRef.current.hasClosed = false;
       return;
     }
 
     if (isHeadTilted) {
+      setProgress(0);
       setPromptText('Posisikan Kepala Tegak');
       setPromptSubtitle('Jangan memiringkan kepala');
-      setProgress(0);
       blinkStateRef.current.hasClosed = false;
       return;
     }

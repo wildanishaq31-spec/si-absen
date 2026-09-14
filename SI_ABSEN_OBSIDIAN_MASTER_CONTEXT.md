@@ -150,9 +150,53 @@ Dashboard Admin menyediakan tombol **"Unduh Excel Rekap"** yang menghasilkan fil
 > Sertifikat SSL (HTTPS) diterbitkan dan diperbarui secara otomatis & gratis oleh Vercel.
 
 ---
+## 🎨 7. Desain Antarmuka Modern (iOS Inset Grouped & Widget Style)
 
-## 🔒 7. Kredensial Administrator Default
+Sistem mengadopsi arsitektur visual modern berbasis **iOS Inset Grouped & Widget Style** yang dirancang untuk kenyamanan maksimal pengguna mobile maupun desktop:
+
+```mermaid
+graph LR
+    Header["📱 SIPP Glassmorphism Header"] --> Dashboard["🏠 User Dashboard (iOS Widgets)"]
+    Dashboard --> HeroCard["⏰ Hero Digital Clock & Status"]
+    Dashboard --> ActionGrid["🗂️ Grid Kartu Presensi 6-Mode"]
+    Dashboard --> RadarMap["📡 Live GPS Radar Geofencing"]
+    Dashboard --> BottomNav["📍 Floating iOS Pill Bottom Bar"]
+    Dashboard --> SidebarDrawer["📂 iOS Inset Grouped Drawer"]
+```
+
+### Komponen Utama UI/UX:
+
+1. **SIPP Glassmorphism Header (`SIPPHeader.jsx`)**:
+   - Header lengkung dengan efek *backdrop-filter blur (16px)*.
+   - Avatar profil live pegawai, tanggal hari ini, tombol notifikasi, dan tombol trigger drawer sidebar.
+
+2. **Hero Attendance Card & Live Clock**:
+   - Kartu waktu digital real-time dengan status kehadiran terkini (Belum Hadir / Sudah Masuk / Sudah Pulang).
+   - Animasi pulsating status dot (Hijau: Aman dalam radius, Merah: Di luar jangkauan kantor).
+
+3. **Action Cards Grid (iOS Widget Style)**:
+   - Kartu-kartu aksi presensi berdesain modular (*Harian, 3-Shift, D3, Dinas Luar, Izin/Cuti*).
+   - Gradient accent, micro-interaction hover, dan transisi elevasi sentuhan modern.
+
+4. **Live GPS Radar Geofencing Map (`LocationRadarMap.jsx`)**:
+   - Tampilan radar GPS presisi berbasis Leaflet dengan visual circle radius kantor.
+   - Indikator jarak real-time (meter) dari titik koordinat kantor instansi.
+
+5. **Sidebar Navigation Drawer (`SidebarDrawer.jsx`)**:
+   - Desain **iOS Inset Grouped List** dengan pengelompokan menu:
+     - **Menu Utama**: Beranda, Riwayat Presensi, Statistik Kehadiran.
+     - **Presensi Mandiri**: Harian, Shift Muter, Program D3, Dinas Luar 1x Wajah, Izin/Sakit/Cuti.
+     - **Pengaturan & Sistem**: Pengaturan Database (GAS/Postgres/RustFS), Bantuan, dan Logout.
+   - Badge status koneksi sistem (Online/Offline, Google Apps Script Active / Postgres Connected).
+
+6. **Floating Bottom Navigation Bar (`BottomNav.jsx`)**:
+   - Navigation bar mengambang (*floating pill*) di bagian bawah layar mobile dengan efek blur & active glow.
+
+---
+
+## 🔒 8. Kredensial Administrator Default
 
 - **URL Admin**: `/administrator/login`
 - **Email**: `admin@siabsen.go.id`
 - **Password**: `admin` *(Sistem mewajibkan penggantian password pada login pertama)*.
+

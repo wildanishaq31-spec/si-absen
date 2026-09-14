@@ -33,6 +33,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
   const [showMonitoringModal, setShowMonitoringModal] = useState(false);
   const [showUpdatePhotoModal, setShowUpdatePhotoModal] = useState(false);
   const [showPresensiMenu, setShowPresensiMenu] = useState(false);
+  const [presensiMenuStep, setPresensiMenuStep] = useState('MAIN'); // 'MAIN' | 'HARIAN_CHOICE' | 'SHIFT_CHOICE' | 'D3_CHOICE'
   const [showFaceCamera, setShowFaceCamera] = useState(false);
   const [cameraMode, setCameraMode] = useState('MASUK'); // 'MASUK' or 'PULANG'
   const [attendanceCategory, setAttendanceCategory] = useState('HARIAN'); // 'HARIAN' or 'SHIFT'
@@ -40,6 +41,11 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [leaveInitialType, setLeaveInitialType] = useState('Izin');
   const [attendanceType, setAttendanceType] = useState('Masuk');
+
+  const handleOpenPresensiStep = (step = 'MAIN') => {
+    setPresensiMenuStep(step);
+    setShowPresensiMenu(true);
+  };
 
   // Real-time ticking clock for iOS Widget Hero
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -299,7 +305,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
                     if (todayCheckIn && !todayCheckOut && todayCheckIn.type !== 'Dinas Luar') {
                       handleOpenPulangCamera('Pulang', 'HARIAN');
                     } else if (!todayCheckIn) {
-                      setShowPresensiMenu(true);
+                      handleOpenPresensiStep('MAIN');
                     }
                   }}
                 >
@@ -338,7 +344,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
                 <button 
                   type="button" 
                   className="ios-quick-btn"
-                  onClick={() => setShowPresensiMenu(true)}
+                  onClick={() => handleOpenPresensiStep('HARIAN_CHOICE')}
                   title="Presensi Harian Pagi"
                 >
                   <div className="ios-quick-icon-wrap bg-blue-50 text-blue-600">
@@ -351,7 +357,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
                 <button 
                   type="button" 
                   className="ios-quick-btn"
-                  onClick={() => setShowPresensiMenu(true)}
+                  onClick={() => handleOpenPresensiStep('SHIFT_CHOICE')}
                   title="Presensi Jadwal Shift"
                 >
                   <div className="ios-quick-icon-wrap bg-teal-50 text-teal-600">
@@ -364,7 +370,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
                 <button 
                   type="button" 
                   className="ios-quick-btn"
-                  onClick={() => setShowPresensiMenu(true)}
+                  onClick={() => handleOpenPresensiStep('D3_CHOICE')}
                   title="Presensi Program D3"
                 >
                   <div className="ios-quick-icon-wrap bg-emerald-50 text-emerald-600">
@@ -418,7 +424,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
       <BottomNav 
         activeTab={activeTab}
         onTabChange={handleBottomTabChange}
-        onFingerprintClick={() => setShowPresensiMenu(true)}
+        onFingerprintClick={() => handleOpenPresensiStep('MAIN')}
       />
 
       {/* Modal Monitoring Kedisiplinan Pegawai */}
@@ -430,6 +436,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
       {/* Modal Presensi Menu (Harian / D3 / Dinas Luar) */}
       <PresensiMenuModal 
         isOpen={showPresensiMenu}
+        initialStep={presensiMenuStep}
         onClose={() => setShowPresensiMenu(false)}
         onSelectMasuk={handleOpenMasukCamera}
         onSelectPulang={handleOpenPulangCamera}

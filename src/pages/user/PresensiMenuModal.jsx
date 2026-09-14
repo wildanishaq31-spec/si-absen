@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Briefcase, Plane, Settings, Clock, ArrowRight, 
   X, FileText, Repeat, Sun, Sunset, Moon, ArrowLeft 
@@ -11,16 +11,23 @@ export function PresensiMenuModal({
   onClose, 
   onSelectMasuk, 
   onSelectPulang, 
-  onSelectLeave 
+  onSelectLeave,
+  initialStep = 'MAIN'
 }) {
   const { showAlert } = useAttendance();
-  const [activeStep, setActiveStep] = useState('MAIN'); // 'MAIN' | 'HARIAN_CHOICE' | 'SHIFT_CHOICE' | 'SHIFT_ACTION'
+  const [activeStep, setActiveStep] = useState(initialStep); // 'MAIN' | 'HARIAN_CHOICE' | 'SHIFT_CHOICE' | 'SHIFT_ACTION' | 'D3_CHOICE'
   const [selectedShift, setSelectedShift] = useState('PAGI'); // 'PAGI' | 'SORE' | 'MALAM'
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveStep(initialStep || 'MAIN');
+    }
+  }, [isOpen, initialStep]);
 
   if (!isOpen) return null;
 
   const handleCloseAll = () => {
-    setActiveStep('MAIN');
+    setActiveStep(initialStep || 'MAIN');
     onClose();
   };
 
@@ -137,11 +144,25 @@ export function PresensiMenuModal({
         {/* 2. SUB-MODAL ABSENSI HARIAN (DINAS PAGI) */}
         {activeStep === 'HARIAN_CHOICE' && (
           <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Sun size={18} color="#00838F" />
+                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#00838F' }}>PRESENSI HARIAN</span>
+              </div>
+              <button 
+                type="button"
+                onClick={handleCloseAll}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
             <div style={{ textAlign: 'center', paddingBottom: '8px' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1E293B' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1E293B', margin: '4px 0' }}>
                 ABSENSI <span style={{ color: '#00838F' }}>HARIAN</span>
               </h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748B' }}>Presensi dinas pagi standar instansi</p>
+              <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>Presensi dinas pagi standar instansi</p>
             </div>
 
             <div className="harian-choice-grid">
@@ -200,14 +221,25 @@ export function PresensiMenuModal({
         {/* 3. SUB-MODAL ABSENSI D3 (MASUK & PULANG) */}
         {activeStep === 'D3_CHOICE' && (
           <>
-            <div style={{ textAlign: 'center', paddingBottom: '8px' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#ECFDF5', color: '#047857', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 800, marginBottom: '6px' }}>
-                <Briefcase size={14} /> Presensi Program D3
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Briefcase size={18} color="#059669" />
+                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#059669' }}>PRESENSI D3</span>
               </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1E293B' }}>
+              <button 
+                type="button"
+                onClick={handleCloseAll}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ textAlign: 'center', paddingBottom: '8px' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1E293B', margin: '4px 0' }}>
                 ABSENSI <span style={{ color: '#059669' }}>D3</span>
               </h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748B' }}>Pilih waktu presensi masuk atau pulang tugas D3 Anda</p>
+              <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>Pilih waktu presensi masuk atau pulang tugas D3 Anda</p>
             </div>
 
             <div className="harian-choice-grid">
@@ -267,11 +299,25 @@ export function PresensiMenuModal({
         {/* 3. SUB-MODAL PEMILIHAN SHIFT (3 SHIFT) */}
         {activeStep === 'SHIFT_CHOICE' && (
           <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Repeat size={18} color="#0D9488" />
+                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0D9488' }}>DINAS 3 SHIFT</span>
+              </div>
+              <button 
+                type="button"
+                onClick={handleCloseAll}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
             <div style={{ textAlign: 'center', paddingBottom: '8px' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0D9488' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0D9488', margin: '4px 0' }}>
                 PILIH SESI DINAS SHIFT
               </h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748B' }}>Pilih jadwal dinas muter bertugas Anda hari ini</p>
+              <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>Pilih jadwal dinas muter bertugas Anda hari ini</p>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', margin: '10px 0 16px 0' }}>
@@ -392,14 +438,30 @@ export function PresensiMenuModal({
         {/* 4. SUB-MODAL AKSI SHIFT (MASUK / PULANG SHIFT TERPILIH) */}
         {activeStep === 'SHIFT_ACTION' && (
           <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Repeat size={18} color={currentShiftConfig.color} />
+                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: currentShiftConfig.color }}>
+                  {currentShiftConfig.name.toUpperCase()}
+                </span>
+              </div>
+              <button 
+                type="button"
+                onClick={handleCloseAll}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
             <div style={{ textAlign: 'center', paddingBottom: '8px' }}>
               <span style={{ background: currentShiftConfig.bg, color: currentShiftConfig.color, fontSize: '0.75rem', fontWeight: 800, padding: '4px 12px', borderRadius: '20px', display: 'inline-block', marginBottom: '6px' }}>
                 {currentShiftConfig.name} ({currentShiftConfig.start} - {currentShiftConfig.end})
               </span>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1E293B' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1E293B', margin: '4px 0' }}>
                 ABSENSI <span style={{ color: currentShiftConfig.color }}>{currentShiftConfig.name.toUpperCase()}</span>
               </h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748B' }}>Pilih waktu presensi masuk atau pulang shift Anda</p>
+              <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>Pilih waktu presensi masuk atau pulang shift Anda</p>
             </div>
 
             <div className="harian-choice-grid">

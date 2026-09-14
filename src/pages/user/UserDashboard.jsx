@@ -339,7 +339,7 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
             {/* 3. iOS QUICK SHORTCUTS DOCK */}
             <div className="ios-quick-shortcuts-widget">
               <div className="ios-quick-shortcuts-header">
-                <Sparkles size={15} className="text-amber-500" />
+                <Sparkles size={16} color="#F59E0B" />
                 <span>Pintasan Akses Cepat</span>
               </div>
               <div className="ios-quick-grid">
@@ -350,8 +350,8 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
                   onClick={() => handleOpenPresensiStep('HARIAN_CHOICE')}
                   title="Presensi Harian Pagi"
                 >
-                  <div className="ios-quick-icon-wrap bg-blue-50 text-blue-600">
-                    <Sun size={20} />
+                  <div className="ios-quick-icon-wrap grad-harian">
+                    <Sun size={22} color="#FFFFFF" />
                   </div>
                   <span className="ios-quick-text">Harian</span>
                 </button>
@@ -363,8 +363,8 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
                   onClick={() => handleOpenPresensiStep('SHIFT_CHOICE')}
                   title="Presensi Jadwal Shift"
                 >
-                  <div className="ios-quick-icon-wrap bg-teal-50 text-teal-600">
-                    <Repeat size={20} />
+                  <div className="ios-quick-icon-wrap grad-shift">
+                    <Repeat size={22} color="#FFFFFF" />
                   </div>
                   <span className="ios-quick-text">Shift</span>
                 </button>
@@ -376,8 +376,8 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
                   onClick={() => handleOpenPresensiStep('D3_CHOICE')}
                   title="Presensi Program D3"
                 >
-                  <div className="ios-quick-icon-wrap bg-emerald-50 text-emerald-600">
-                    <Briefcase size={20} />
+                  <div className="ios-quick-icon-wrap grad-d3">
+                    <Briefcase size={22} color="#FFFFFF" />
                   </div>
                   <span className="ios-quick-text">D3</span>
                 </button>
@@ -389,8 +389,8 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
                   onClick={() => handleOpenMasukCamera('Dinas Luar', 'DINAS_LUAR')}
                   title="Presensi Dinas Luar"
                 >
-                  <div className="ios-quick-icon-wrap bg-amber-50 text-amber-600">
-                    <Plane size={20} />
+                  <div className="ios-quick-icon-wrap grad-dinas">
+                    <Plane size={22} color="#FFFFFF" />
                   </div>
                   <span className="ios-quick-text">Dinas Luar</span>
                 </button>
@@ -402,8 +402,8 @@ export function UserDashboard({ onSwitchToAdmin, onLogout }) {
                   onClick={() => handleOpenLeaveModal('Izin')}
                   title="Formulir Izin / Sakit / Cuti"
                 >
-                  <div className="ios-quick-icon-wrap bg-purple-50 text-purple-600">
-                    <FileText size={20} />
+                  <div className="ios-quick-icon-wrap grad-izin">
+                    <FileText size={22} color="#FFFFFF" />
                   </div>
                   <span className="ios-quick-text">Izin/Cuti</span>
                 </button>

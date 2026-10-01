@@ -69,12 +69,10 @@ function doPost(e) {
     // 1. SUBMIT ATTENDANCE (MASUK / PULANG)
     if (action === 'SUBMIT_ATTENDANCE' || action === 'SUBMIT_MASUK' || action === 'SUBMIT_PULANG') {
       var record = contents.data || contents.record || contents;
-      var photoUrl = '';
-
-      // Upload photo snapshot to Google Drive if provided
+      var photoUrl = '';      // Upload photo snapshot to Google Drive if provided
       if (record.evidenceSnapshot && contents.folderId) {
         try {
-          photoUrl = saveImageToDrive(record.evidenceSnapshot, contents.folderId, record.userName, record.type);
+          photoUrl = saveImageToDrive(record.evidenceSnapshot, contents.folderId, record.userName, record.type, record.date, record.time);
           record.evidenceUrl = photoUrl;
         } catch (errDrive) {
           Logger.log('Drive upload err: ' + errDrive);
@@ -239,12 +237,69 @@ function deleteRowsById(sheet, idList) {
   }
 }
 
-function saveImageToDrive(base64Data, folderId, userName, type) {
-  var folder = DriveApp.getFolderById(folderId);
-  var cleanBase64 = base64Data.replace(/^data:image\\/[a-z]+;base64,/, '');
+function getOrCreateSubFolder(parentFolder, folderName) {
+  var folders = parentFolder.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  var newFolder = parentFolder.createFolder(folderName);
+  newFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return newFolder;
+}
+
+function saveImageToDrive(base64Data, rootFolderId, userName, type, dateStr, timeStr) {
+  var rootFolder = DriveApp.getFolderById(rootFolderId);
+
+  var now = new Date();
+  var day = String(now.getDate()).padStart(2, '0');
+  var monthNum = String(now.getMonth() + 1).padStart(2, '0');
+  var monthIndex = now.getMonth();
+  var year = now.getFullYear();
+
+  var MONTH_NAMES = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ];
+
+  if (dateStr) {
+    var matchDMY = String(dateStr).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (matchDMY) {
+      day = String(parseInt(matchDMY[1], 10)).padStart(2, '0');
+      var m = parseInt(matchDMY[2], 10);
+      monthNum = String(m).padStart(2, '0');
+      monthIndex = Math.max(0, Math.min(11, m - 1));
+      year = matchDMY[3];
+    } else {
+      var matchYMD = String(dateStr).match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+      if (matchYMD) {
+        year = matchYMD[1];
+        var m2 = parseInt(matchYMD[2], 10);
+        monthNum = String(m2).padStart(2, '0');
+        monthIndex = Math.max(0, Math.min(11, m2 - 1));
+        day = String(parseInt(matchYMD[3], 10)).padStart(2, '0');
+      }
+    }
+  }
+
+  // 1. Folder Bulan (Contoh: "Oktober")
+  var monthFolderName = MONTH_NAMES[monthIndex];
+  var monthFolder = getOrCreateSubFolder(rootFolder, monthFolderName);
+
+  // 2. Folder Tanggal format dd-mm-yyyy (Contoh: "01-10-2026")
+  var dateFolderName = day + "-" + monthNum + "-" + year;
+  var dateFolder = getOrCreateSubFolder(monthFolder, dateFolderName);
+
+  // 3. Simpan File Foto Bukti Presensi
+  var cleanBase64 = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
   var decoded = Utilities.base64Decode(cleanBase64);
-  var blob = Utilities.newBlob(decoded, 'image/jpeg', (userName || 'Pegawai') + '_' + (type || 'Absen') + '_' + Date.now() + '.jpg');
-  var file = folder.createFile(blob);
+
+  var cleanName = (userName || 'Pegawai').replace(/[^a-zA-Z0-9_-]/g, '_');
+  var cleanType = (type || 'Absen').replace(/[^a-zA-Z0-9_-]/g, '_');
+  var timeClean = (timeStr || '').replace(/:/g, '-');
+  var fileName = cleanName + '_' + cleanType + (timeClean ? '_' + timeClean : '_' + Date.now()) + '.jpg';
+
+  var blob = Utilities.newBlob(decoded, 'image/jpeg', fileName);
+  var file = dateFolder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return file.getUrl();
 }

@@ -163,9 +163,20 @@ export function UserHistoryPage({ onNavigateBack }) {
                   {/* Selfie / Evidence Thumbnail */}
                   <div className="log-card-photo-box">
                     <img 
-                      src={item.evidenceSnapshot || item.evidenceUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'} 
+                      src={
+                        (item.evidenceSnapshot && typeof item.evidenceSnapshot === 'string' && item.evidenceSnapshot.startsWith('data:image'))
+                          ? item.evidenceSnapshot
+                          : (item.evidenceUrl && typeof item.evidenceUrl === 'string' && !item.evidenceUrl.includes('drive.google.com/drive/folders') && (item.evidenceUrl.startsWith('http') || item.evidenceUrl.startsWith('data:'))
+                              ? item.evidenceUrl
+                              : (currentUser?.photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80')
+                            )
+                      } 
                       alt="Foto Verifikasi Wajah" 
                       className="log-photo-img"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = currentUser?.photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80';
+                      }}
                     />
                   </div>
 

@@ -151,7 +151,7 @@ export function AuthProvider({ children }) {
     return { success: true, user: userWithLogin };
   };
 
-  const register = async ({ name, email, password, nip, skpd, photo }) => {
+  const register = async ({ name, email, password, nip, skpd, photo, faceDescriptor, face_descriptor }) => {
     // Refresh latest users from cloud first
     await refreshUsersFromCloud();
 
@@ -188,6 +188,8 @@ export function AuthProvider({ children }) {
     // Hash password with SHA-256
     const hashedPassword = await hashPassword(password);
 
+    const descriptorVal = faceDescriptor || face_descriptor || null;
+
     const newUser = {
       id: `U-${Date.now()}`,
       name: name.trim(),
@@ -197,8 +199,8 @@ export function AuthProvider({ children }) {
       nip: nipClean,
       skpd: skpd.trim(),
       photo: photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-      faceDescriptor: faceDescriptor || null,
-      face_descriptor: faceDescriptor || null
+      faceDescriptor: descriptorVal,
+      face_descriptor: descriptorVal
     };
 
     const saved = storageService.addUser(newUser);

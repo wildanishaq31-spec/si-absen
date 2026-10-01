@@ -200,3 +200,14 @@ graph LR
 - **Email**: `admin@siabsen.go.id`
 - **Password**: `admin` *(Sistem mewajibkan penggantian password pada login pertama)*.
 
+---
+
+## 📚 9. Indeks Log Sesi Vault Obsidian
+
+Berikut adalah riwayat catatan log sesi per tanggal di direktori `docs/obsidian/`:
+- [[docs/obsidian/LOG_SESI_CHAT_OBSIDIAN_2026-09-14.md|Log Sesi 14 September 2026]] *(Sub-Modal Routing, Gradient Quick Shortcuts, Strict Oval FaceID Geometry, Hover & Click Animations)*
+- [[docs/obsidian/LOG_SESI_CHAT_OBSIDIAN_2026-09-13.md|Log Sesi 13 September 2026]] *(Multi-Engine Database Setup, Vercel Serverless Accordion Guide, Presensi D3 & Dinas Luar 1x Wajah)*
+- [[docs/obsidian/SI_ABSEN_CATATAN_PENGEMBANGAN_OBSIDIAN.md|Catatan Pengembangan & Changelog Lengkap]]
+- [[docs/PANDUAN_SETUP_VERCEL_POSTGRES_DAN_DOMAIN.md|Panduan Setup Vercel Postgres & Domain]]
+
+

@@ -21,7 +21,11 @@
     <script>
       (function() {
         var p = (window.location.pathname || '').toLowerCase();
-        if (p.includes('admin') || p.includes('administrator')) {
+        var isPwa = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || document.referrer.includes('android-app://');
+        var isExcluded = p.includes('admin') || p.includes('administrator') || p.includes('download') || p.includes('unduh') || p.includes('install');
+        
+        // Only allow splash preloader in installed PWA standalone mode, never on /download or admin
+        if (isExcluded || !isPwa) {
           var style = document.createElement('style');
           style.innerHTML = '#pwa-preloader { display: none !important; }';
           document.head.appendChild(style);

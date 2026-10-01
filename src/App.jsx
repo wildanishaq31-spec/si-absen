@@ -17,13 +17,18 @@ function AppContent() {
   // Helper to read current URL path
   const getPath = () => (typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '/');
 
-  // Initial App Opening Splash Screen State (Hanya untuk Pegawai / PWA, tidak untuk Administrator di Browser Laptop)
-  const isInitialAdmin = () => {
-    const p = getPath();
-    return p.includes('administrator') || p.includes('admin');
+  // Initial App Opening Splash Screen State (Hanya untuk PWA Pegawai terpasang, tidak untuk /download atau browser biasa)
+  const shouldShowSplash = () => {
+    if (typeof window === 'undefined') return false;
+    const p = (window.location.pathname || '').toLowerCase();
+    const isExcluded = p.includes('download') || p.includes('unduh') || p.includes('install') || p.includes('admin') || p.includes('administrator');
+    if (isExcluded) return false;
+
+    const isPwa = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || document.referrer.includes('android-app://');
+    return isPwa;
   };
 
-  const [showSplash, setShowSplash] = useState(() => !isInitialAdmin());
+  const [showSplash, setShowSplash] = useState(shouldShowSplash);
   const [currentPath, setCurrentPath] = useState(getPath);
 
   // Sync state on browser back/forward buttons
@@ -141,7 +146,7 @@ function AppContent() {
   return (
     <>
       <Toast toast={toast} onClose={closeToast} />
-      {showSplash && !isAdminPath && (
+      {showSplash && !isAdminPath && !isDownloadPath && (
         <SplashScreen onFinish={() => setShowSplash(false)} />
       )}
       {renderPage()}
